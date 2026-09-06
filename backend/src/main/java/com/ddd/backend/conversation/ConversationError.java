@@ -15,6 +15,8 @@ public enum ConversationError {
             "AI가 처리 중이며 pending 메시지도 이미 존재합니다."),
     QUESTION_MISMATCH(HttpStatus.CONFLICT, "MESSAGE_409_QUESTION_MISMATCH",
             "현재 질문과 일치하지 않습니다."),
+    PROTECTED_GATE_ACTIVE(HttpStatus.CONFLICT, "MESSAGE_409_PROTECTED_GATE_ACTIVE",
+            "보호 확인이 진행 중이므로 새 메시지를 처리할 수 없습니다."),
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "MESSAGE_400_INVALID_REQUEST",
             "메시지 요청이 올바르지 않습니다."),
     SENSITIVE_CONTENT(HttpStatus.BAD_REQUEST, "MESSAGE_400_SENSITIVE_CONTENT",

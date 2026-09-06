@@ -73,6 +73,24 @@ public final class OverlayTargetService {
         return saved;
     }
 
+    public PublicOverlayTarget create(String sessionId, SanitizedDomSnapshot snapshot,
+            String internalElementId, String expectedRole,
+            String expectedAccessibleLabel, String guide) {
+        DemoAgentBridgeBinding bridge = bridges.find(sessionId)
+                .orElseThrow(() -> new OverlayTargetException(OverlayTargetError.BRIDGE_TOKEN_INVALID));
+        SanitizedDomSnapshot.ElementSnapshot source = snapshot.elements().stream()
+                .filter(element -> element.elementId().equals(internalElementId)).findFirst()
+                .orElseThrow(() -> new OverlayTargetException(OverlayTargetError.TARGET_NOT_FOUND));
+        String actualRole = safeRole(source.role(), source.tag());
+        String actualLabel = safeText(source.ariaLabel() == null || source.ariaLabel().isBlank()
+                ? source.text() : source.ariaLabel(), 120);
+        if (!actualRole.equals(expectedRole == null ? null : expectedRole.toLowerCase(Locale.ROOT))
+                || !actualLabel.equals(expectedAccessibleLabel)) {
+            throw new OverlayTargetException(OverlayTargetError.TARGET_NOT_INTERACTABLE);
+        }
+        return create(sessionId, bridge.pageIdentity(), snapshot, internalElementId, guide);
+    }
+
     private String safeRole(String role, String tag) {
         String normalized = role == null || role.isBlank() ? tag : role;
         normalized = normalized.toLowerCase(Locale.ROOT);

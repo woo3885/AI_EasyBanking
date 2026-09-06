@@ -12,6 +12,9 @@ import org.springframework.stereotype.Service;
 import com.ddd.backend.conversation.event.ConversationEventPublisher;
 import com.ddd.backend.conversation.overlay.OverlayClearReason;
 import com.ddd.backend.conversation.overlay.OverlayTargetStore;
+import com.ddd.backend.conversation.gate.ConversationProtectedGateRegistry;
+import com.ddd.backend.conversation.overlay.OverlayTargetService;
+import com.ddd.backend.automation.dom.SanitizedDomSnapshot;
 
 /** Day 1 ASK_USER orchestration. It never invokes Browser Action execution. */
 @Service
@@ -24,6 +27,8 @@ public final class ConversationAgentCoordinator {
     private final ConversationEventPublisher events;
     private ConversationAgentDomDecisionService domDecisionService;
     private OverlayTargetStore overlayTargets;
+    private ConversationProtectedGateRegistry protectedGates;
+    private OverlayTargetService overlayTargetService;
 
     public ConversationAgentCoordinator(ConversationService conversations, SessionMessageMailbox mailbox,
             AutomationSessionRepository sessions, ConversationAgentClient client,
@@ -40,6 +45,16 @@ public final class ConversationAgentCoordinator {
     @Autowired(required = false)
     void setOverlayTargets(OverlayTargetStore overlayTargets) {
         this.overlayTargets = overlayTargets;
+    }
+
+    @Autowired(required = false)
+    void setProtectedGates(ConversationProtectedGateRegistry protectedGates) {
+        this.protectedGates = protectedGates;
+    }
+
+    @Autowired(required = false)
+    void setOverlayTargetService(OverlayTargetService overlayTargetService) {
+        this.overlayTargetService = overlayTargetService;
     }
 
     public ConversationAgentDecision process(String sessionId, MessageAcceptance acceptance,
@@ -83,9 +98,10 @@ public final class ConversationAgentCoordinator {
                 events.message(sessionId, assistantMessageId, message.sequence(), message.content(),
                         applied.revision(), WorkflowStatus.AI_EXECUTING, null, now);
                 if (domDecisionService != null && domDecisionService.canContinue(sessionId)) {
-                    decision = domDecisionService.decideOnce(
+                    var result = domDecisionService.decideOnce(
                             sessionId, acceptance, state, content, answerToQuestionId);
-                    applyDomDecision(sessionId, state, session, decision);
+                    decision = result.decision();
+                    applyDomDecision(sessionId, state, session, decision, result.snapshot());
                 }
             } else {
                 throw new IllegalArgumentException("Unsupported conversation decision mode");
@@ -95,8 +111,19 @@ public final class ConversationAgentCoordinator {
         return decision;
     }
 
+    public void applyObservedDomDecision(String sessionId, ConversationAgentDecision decision,
+            SanitizedDomSnapshot snapshot) {
+        ConversationState state = conversations.state(sessionId);
+        synchronized (state) {
+            AutomationSession session = sessions.findById(sessionId)
+                    .orElseThrow(() -> new IllegalStateException("Session not found"));
+            applyDomDecision(sessionId, state, session, decision, snapshot);
+        }
+    }
+
     private void applyDomDecision(String sessionId, ConversationState state,
-            AutomationSession session, ConversationAgentDecision decision) {
+            AutomationSession session, ConversationAgentDecision decision,
+            SanitizedDomSnapshot snapshot) {
         if (decision.mode() == ConversationInteractionMode.ASK_USER
                 || decision.mode() == ConversationInteractionMode.GOAL_PATCH_PROPOSED) {
             throw new IllegalArgumentException("Latest DOM decision cannot start another goal update in the same turn");
@@ -120,6 +147,20 @@ public final class ConversationAgentCoordinator {
                 default -> null;
             };
             if (reason != null) overlayTargets.clear(sessionId, reason);
+        }
+        if (protectedGates != null && (decision.mode() == ConversationInteractionMode.SECURE_INPUT_REQUIRED
+                || decision.mode() == ConversationInteractionMode.RISK_WARNING
+                || decision.mode() == ConversationInteractionMode.FINAL_CONFIRMATION_REQUIRED)) {
+            protectedGates.activate(sessionId, decision);
+        }
+        if (decision.mode() == ConversationInteractionMode.GUIDE_USER) {
+            if (overlayTargetService == null || snapshot == null) {
+                throw new IllegalStateException("GUIDE_USER Overlay target service가 준비되지 않았습니다.");
+            }
+            var candidate = decision.actionCandidate();
+            overlayTargetService.create(
+                    sessionId, snapshot, candidate.targetElementId(), candidate.role(),
+                    candidate.accessibleLabel(), candidate.guide());
         }
         session.transitionTo(status);
         sessions.save(session);

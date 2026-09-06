@@ -25,6 +25,8 @@ import java.util.Set;
 import java.util.UUID;
 
 import static com.ddd.backend.conversation.overlay.OverlayTargetError.*;
+import com.ddd.backend.conversation.gate.ConversationProtectedGateRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public final class InteractionObservationService {
@@ -42,6 +44,7 @@ public final class InteractionObservationService {
     private final AutomationSessionRepository sessions;
     private final ConversationEventPublisher events;
     private final ObjectProvider<ConversationObservationResumePort> resumePort;
+    private ConversationProtectedGateRegistry protectedGates;
 
     public InteractionObservationService(DemoAgentBridgeRegistry bridges, OverlayTargetStore targets,
             BrowserSessionManager browsers, ElementRegistry elements, SanitizedDomSnapshotService snapshots,
@@ -51,12 +54,20 @@ public final class InteractionObservationService {
         this.snapshots = snapshots; this.sessions = sessions; this.events = events; this.resumePort = resumePort;
     }
 
+    @Autowired(required = false)
+    void setProtectedGates(ConversationProtectedGateRegistry protectedGates) {
+        this.protectedGates = protectedGates;
+    }
+
     public InteractionObservationAcceptedResponse observe(String sessionId, String bridgeToken,
             String pageIdentity, String origin, InteractionObservationRequest request) {
         DemoAgentBridgeBinding binding = authenticate(sessionId, bridgeToken, pageIdentity, origin);
         AutomationSession session = sessions.findById(sessionId)
                 .orElseThrow(() -> new OverlayTargetException(TARGET_NOT_FOUND));
-        if (BLOCKED.contains(session.getStatus())) throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
+        if (BLOCKED.contains(session.getStatus())
+                || protectedGates != null && protectedGates.blocksAutomation(sessionId)) {
+            throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
+        }
         OverlayTargetStore.ClaimedTarget claimed = targets.claim(sessionId, request.requestId(),
                 request.targetId(), pageIdentity, request.sourceSnapshotId());
         try {
@@ -76,7 +87,7 @@ public final class InteractionObservationService {
         events.userActionObserved(consumed, "observation-" + UUID.randomUUID(),
                 request.requestId(), resulting.snapshotId(), acceptedAt);
         ConversationObservationResumePort port = resumePort.getIfAvailable();
-        if (port != null) port.resumeOnce(sessionId, consumed, resulting);
+        if (port != null) port.resumeOnce(sessionId, request.requestId(), consumed, resulting);
         return new InteractionObservationAcceptedResponse(sessionId, request.requestId(),
                 request.targetId(), binding.pageIdentity(), request.sourceSnapshotId(),
                 "OBSERVATION_ACCEPTED", acceptedAt);

@@ -32,7 +32,7 @@ public class ConversationAgentDomDecisionService {
         return bridges.find(sessionId).isPresent();
     }
 
-    public ConversationAgentDecision decideOnce(
+    public DomDecisionResult decideOnce(
             String sessionId,
             MessageAcceptance acceptance,
             ConversationState state,
@@ -51,6 +51,12 @@ public class ConversationAgentDomDecisionService {
                 new ConversationAgentRequest.UserMessage(content, answerToQuestionId),
                 new ConversationAgentRequest.SnapshotContext(
                         snapshot.snapshotId(), bridge.pageIdentity(), snapshot));
-        return validator.validate(request, client.decide(request));
+        return new DomDecisionResult(
+                validator.validate(request, client.decide(request)), snapshot);
     }
+
+    public record DomDecisionResult(
+            ConversationAgentDecision decision,
+            SanitizedDomSnapshot snapshot
+    ) { }
 }

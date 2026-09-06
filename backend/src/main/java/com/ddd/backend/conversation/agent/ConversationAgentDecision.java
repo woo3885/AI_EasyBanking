@@ -7,5 +7,15 @@ public record ConversationAgentDecision(
         QuestionCandidate question, ActionCandidate actionCandidate
 ) {
     public record QuestionCandidate(String fieldKey) { }
-    public record ActionCandidate(String actionType) { }
+    public record ActionCandidate(
+            String actionType,
+            String targetElementId,
+            String role,
+            String accessibleLabel,
+            String guide
+    ) {
+        public ActionCandidate(String actionType) {
+            this(actionType, null, null, null, null);
+        }
+    }
 }

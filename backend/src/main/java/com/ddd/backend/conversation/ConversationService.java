@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.Set;
 import com.ddd.backend.domain.session.WorkflowStatus;
 import com.ddd.backend.conversation.event.ConversationEventStore;
+import com.ddd.backend.conversation.gate.ConversationProtectedGateRegistry;
 
 @Service
 public final class ConversationService {
@@ -27,6 +28,12 @@ public final class ConversationService {
     private final SessionMessageMailbox mailbox;
     private final ConversationMessagePolicy messagePolicy;
     private final ConversationEventStore eventStore;
+    private ConversationProtectedGateRegistry protectedGates;
+
+    @Autowired(required = false)
+    void setProtectedGates(ConversationProtectedGateRegistry protectedGates) {
+        this.protectedGates = protectedGates;
+    }
 
     @Autowired
     public ConversationService(
@@ -105,6 +112,9 @@ public final class ConversationService {
             MessageAcceptance duplicate = state.duplicateAcceptance(
                     requestId.trim(), messageId.trim());
             if (duplicate != null) return duplicate;
+            if (protectedGates != null && protectedGates.blocksAutomation(sessionId)) {
+                throw new ConversationException(ConversationError.PROTECTED_GATE_ACTIVE);
+            }
             if (state.sequence() != expectedSequence) {
                 throw new ConversationException(ConversationError.STALE_SEQUENCE);
             }
