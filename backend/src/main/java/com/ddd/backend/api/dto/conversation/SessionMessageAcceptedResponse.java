@@ -14,7 +14,8 @@ public record SessionMessageAcceptedResponse(
         MessageQueueStatus queueStatus,
         WorkflowStatus workflowStatus,
         Instant acceptedAt,
-        boolean duplicate
+        boolean duplicate,
+        UserBrowserBridgeBootstrapResponse bridgeBinding
 ) {
     public static SessionMessageAcceptedResponse from(
             MessageAcceptance acceptance,
@@ -23,6 +24,17 @@ public record SessionMessageAcceptedResponse(
         return new SessionMessageAcceptedResponse(
                 acceptance.sessionId(), acceptance.requestId(), acceptance.messageId(),
                 acceptance.acceptedSequence(), acceptance.queueStatus(), workflowStatus,
-                acceptance.acceptedAt(), acceptance.duplicate());
+                acceptance.acceptedAt(), acceptance.duplicate(), null);
+    }
+
+    public static SessionMessageAcceptedResponse from(
+            MessageAcceptance acceptance,
+            WorkflowStatus workflowStatus,
+            UserBrowserBridgeBootstrapResponse bridgeBinding
+    ) {
+        return new SessionMessageAcceptedResponse(
+                acceptance.sessionId(), acceptance.requestId(), acceptance.messageId(),
+                acceptance.acceptedSequence(), acceptance.queueStatus(), workflowStatus,
+                acceptance.acceptedAt(), acceptance.duplicate(), bridgeBinding);
     }
 }

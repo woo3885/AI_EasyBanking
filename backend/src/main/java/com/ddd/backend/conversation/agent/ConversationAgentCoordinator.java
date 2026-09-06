@@ -88,7 +88,10 @@ public final class ConversationAgentCoordinator {
                 String answeredQuestionId = state.activeQuestionId();
                 UserGoal applied = state.applyGoalPatch(decision.goalId(), decision.baseGoalRevision(),
                         decision.requestMessageId(), decision.goalPatch(), null);
-                state.clearQuestion(answeredQuestionId);
+                if (answeredQuestionId != null) {
+                    state.requireActiveQuestion(answerToQuestionId);
+                    state.clearQuestion(answeredQuestionId);
+                }
                 session.transitionTo(WorkflowStatus.AI_EXECUTING);
                 sessions.save(session);
                 Instant now = Instant.now();

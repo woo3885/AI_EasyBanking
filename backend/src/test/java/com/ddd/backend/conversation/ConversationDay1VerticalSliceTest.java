@@ -16,6 +16,37 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 class ConversationDay1VerticalSliceTest {
     @Test
+    void completeInitialRequestAppliesPatchWithoutClearingAbsentQuestion() {
+        var sessions = new InMemoryAutomationSessionRepository();
+        AutomationSession session = sessions.save(AutomationSession.create("100만원 12개월 예금"));
+        var states = new ConversationStateStore(Duration.ofMinutes(30));
+        var mailbox = new SessionMessageMailbox();
+        var conversations = new ConversationService(sessions, states, mailbox,
+                new ConversationMessagePolicy(), new ConversationEventStore());
+        ConversationAgentClient complete = request -> new ConversationAgentDecision(
+                request.requestId(), request.requestMessageId(), request.goal().goalId(), 0,
+                ConversationInteractionMode.GOAL_PATCH_PROPOSED, null, 1.0, "GOAL_UPDATED",
+                "LATEST_DOM_DECISION", null,
+                new UserGoalPatch(0, "DEPOSIT", new UserGoal.Amount("1000000", "KRW"),
+                        new UserGoal.Duration(12, "MONTH"), List.of(), null, null),
+                null, null);
+        var coordinator = new ConversationAgentCoordinator(
+                conversations, mailbox, sessions, complete,
+                new ConversationAgentContractValidator(new ConversationMessagePolicy()),
+                new ConversationEventPublisher(new ConversationEventStore(), mock(SimpMessagingTemplate.class)));
+        MessageAcceptance accepted = conversations.acceptInitial(
+                session.getSessionId(), "request-complete", "message-complete",
+                "100만원 12개월 예금", null);
+
+        coordinator.process(session.getSessionId(), accepted, "100만원 12개월 예금", null);
+
+        ConversationSnapshot snapshot = conversations.snapshot(session.getSessionId());
+        assertThat(snapshot.activeQuestion()).isNull();
+        assertThat(snapshot.userGoal().duration()).isEqualTo(new UserGoal.Duration(12, "MONTH"));
+        assertThat(snapshot.workflowStatus()).isEqualTo(WorkflowStatus.AI_EXECUTING);
+    }
+
+    @Test
     void firstMessageProducesOneAcceptedAndOneBackendAuthoritativeQuestion() {
         var sessions = new InMemoryAutomationSessionRepository();
         AutomationSession session = sessions.save(AutomationSession.create("100만원으로 예금 가입해줘"));

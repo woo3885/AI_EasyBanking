@@ -9,6 +9,8 @@ import com.ddd.backend.security.secureinput.SecureInputTransportPolicy;
 import com.ddd.backend.conversation.ConversationService;
 import com.ddd.backend.conversation.MessageAcceptance;
 import com.ddd.backend.conversation.MessageQueueStatus;
+import com.ddd.backend.conversation.bridge.UserBrowserBridgeBinding;
+import com.ddd.backend.conversation.bridge.UserBrowserBridgeService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -56,6 +58,9 @@ class AutomationSessionControllerTest {
 
     @MockitoBean
     private ConversationService conversationService;
+
+    @MockitoBean
+    private UserBrowserBridgeService userBrowserBridgeService;
 
     @Test
     void 보안입력완료는_raw_value없는_전용_endpoint로_접수한다()
@@ -237,8 +242,16 @@ class AutomationSessionControllerTest {
                         session.getSessionId(), "req-1", "msg-1", 1,
                         MessageQueueStatus.ACTIVE,
                         java.time.Instant.parse("2026-09-01T00:00:00Z"), false));
+        when(userBrowserBridgeService.issueIfAvailable(
+                org.mockito.ArgumentMatchers.eq(session.getSessionId()),
+                org.mockito.ArgumentMatchers.eq("http://127.0.0.1:5173")))
+                .thenReturn(new UserBrowserBridgeBinding(
+                        session.getSessionId(), "binding-1", "one-time-memory-token", "page-1",
+                        "http://127.0.0.1:5173",
+                        java.time.Instant.parse("2026-09-01T00:30:00Z")));
 
         mockMvc.perform(post("/api/v1/sessions")
+                        .header("Origin", "http://127.0.0.1:5173")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -253,6 +266,13 @@ class AutomationSessionControllerTest {
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.data.acceptedSequence").value(1))
                 .andExpect(jsonPath("$.data.queueStatus").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.bridgeBinding.sessionId").value(session.getSessionId()))
+                .andExpect(jsonPath("$.data.bridgeBinding.browserBindingId").value("binding-1"))
+                .andExpect(jsonPath("$.data.bridgeBinding.bridgeToken").value("one-time-memory-token"))
+                .andExpect(jsonPath("$.data.bridgeBinding.pageIdentity").value("page-1"))
+                .andExpect(jsonPath("$.data.bridgeBinding.pageReadyStatus").value("READY"))
+                .andExpect(jsonPath("$.data.bridgeBinding.recoveryPath")
+                        .value("/api/v1/sessions/" + session.getSessionId() + "/conversation/bridge"))
                 .andExpect(jsonPath("$.message").value(
                         "메시지가 접수되었습니다. AI 판단이나 실행 성공을 의미하지 않습니다."));
 

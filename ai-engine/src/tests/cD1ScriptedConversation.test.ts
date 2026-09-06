@@ -81,6 +81,7 @@ test("C-D1-03 pending duration proposes a deterministic goal patch", async () =>
     },
     question: null,
     actionCandidate: null,
+    navigationCandidate: null,
   });
   assert.equal(validateAgentDecision(first).valid, true);
 });

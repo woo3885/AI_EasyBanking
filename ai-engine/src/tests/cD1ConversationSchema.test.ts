@@ -41,6 +41,7 @@ const askUserDecision = {
   goalPatch: null,
   question: { fieldKey: "duration" },
   actionCandidate: null,
+  navigationCandidate: null,
 };
 
 const request = {

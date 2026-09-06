@@ -6,9 +6,12 @@ import com.ddd.backend.automation.session.BrowserSessionManager;
 import com.ddd.backend.conversation.ConversationMessagePolicy;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeBinding;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeRegistry;
+import com.ddd.backend.conversation.bridge.UserBrowserBridgeRegistry;
+import com.ddd.backend.conversation.navigation.BrowserNavigationService;
 import com.ddd.backend.conversation.event.ConversationEventPublisher;
 import com.microsoft.playwright.Locator;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -29,6 +32,8 @@ public final class OverlayTargetService {
     private final OverlayTargetStore targets;
     private final ConversationEventPublisher events;
     private final ConversationMessagePolicy textPolicy;
+    private UserBrowserBridgeRegistry userBrowserBindings;
+    private BrowserNavigationService browserNavigations;
 
     public OverlayTargetService(BrowserSessionManager browsers, ElementRegistry elements,
             DemoAgentBridgeRegistry bridges, OverlayTargetStore targets,
@@ -38,11 +43,29 @@ public final class OverlayTargetService {
         targets.setClearListener((target, reason) -> events.overlayClear(target, reason, Instant.now()));
     }
 
+    @Autowired(required = false)
+    void setUserBrowserBindings(UserBrowserBridgeRegistry bindings) {
+        this.userBrowserBindings = bindings;
+    }
+
+    @Autowired(required = false)
+    void setBrowserNavigations(BrowserNavigationService navigations) {
+        this.browserNavigations = navigations;
+    }
+
     public PublicOverlayTarget create(String sessionId, String pageIdentity,
             SanitizedDomSnapshot snapshot, String internalElementId, String guide) {
         DemoAgentBridgeBinding bridge = bridges.find(sessionId)
                 .orElseThrow(() -> new OverlayTargetException(OverlayTargetError.BRIDGE_TOKEN_INVALID));
         if (!bridge.pageIdentity().equals(pageIdentity)) throw new OverlayTargetException(OverlayTargetError.TARGET_STALE_PAGE);
+        if (browserNavigations != null && browserNavigations.blocksTarget(sessionId)) {
+            throw new OverlayTargetException(OverlayTargetError.TARGET_NOT_INTERACTABLE);
+        }
+        String publicPageIdentity = userBrowserBindings == null
+                ? pageIdentity
+                : userBrowserBindings.find(sessionId)
+                        .orElseThrow(() -> new OverlayTargetException(OverlayTargetError.BRIDGE_TOKEN_INVALID))
+                        .pageIdentity();
         SanitizedDomSnapshot.ElementSnapshot source = snapshot.elements().stream()
                 .filter(element -> element.elementId().equals(internalElementId)).findFirst()
                 .orElseThrow(() -> new OverlayTargetException(OverlayTargetError.TARGET_NOT_FOUND));
@@ -61,7 +84,7 @@ public final class OverlayTargetService {
         });
         Instant now = Instant.now();
         PublicOverlayTarget target = new PublicOverlayTarget(
-                UUID.randomUUID().toString(), sessionId, pageIdentity, snapshot.snapshotId(),
+                UUID.randomUUID().toString(), sessionId, publicPageIdentity, snapshot.snapshotId(),
                 OverlayCoordinateSpace.VIEWPORT_CSS_PX,
                 new PublicOverlayTarget.Rectangle(geometry.x, geometry.y, geometry.width, geometry.height),
                 new PublicOverlayTarget.Viewport(geometry.viewportWidth, geometry.viewportHeight),

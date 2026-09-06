@@ -5,7 +5,11 @@ import test from "node:test";
 
 import { createServer } from "../api/server.js";
 import type { ConversationModelPort } from "../conversation/conversationModel.port.js";
-import { C_D2_DEPOSIT_FIXTURES } from "./fixtures/cD2Deposit.fixtures.js";
+import {
+  C_D2_DEPOSIT_FIXTURES,
+  conversationRequest,
+  conversationSnapshot,
+} from "./fixtures/cD2Deposit.fixtures.js";
 
 async function withServer(
   run: (url: string) => Promise<void>,
@@ -61,6 +65,7 @@ test("C-D2 conversation HTTP rejects a model attempt to auto-select a product", 
         sourceSnapshotId: input.snapshot!.sourceSnapshotId,
         goalPatch: null,
         question: null,
+        navigationCandidate: null,
         actionCandidate: {
           actionType: "CLICK",
           targetElementId: "el-product-12m",
@@ -83,4 +88,28 @@ test("C-D2 conversation HTTP rejects a model attempt to auto-select a product", 
     assert.equal(body.code, "CONVERSATION_INVALID_DECISION");
     assert.equal(JSON.stringify(body).includes("el-product"), false);
   }, unsafeModel);
+});
+
+test("C-NAV conversation HTTP returns only a semantic navigation candidate", async () => {
+  const request = conversationRequest(conversationSnapshot("snap-http-navigation", []));
+  request.goal = { ...request.goal, stage: "DEPOSIT_ENTRY" };
+  await withServer(async (url) => {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    const body = await response.json() as Record<string, unknown>;
+    assert.equal(response.status, 200);
+    assert.equal(body.mode, "NAVIGATION_REQUIRED");
+    assert.equal(body.sourceSnapshotId, "snap-http-navigation");
+    assert.equal(body.actionCandidate, null);
+    assert.deepEqual(
+      Object.keys(body.navigationCandidate as Record<string, unknown>).sort(),
+      ["decisionId", "navigationMode", "semanticRoute"],
+    );
+    assert.equal((body.navigationCandidate as Record<string, unknown>).semanticRoute, "DEPOSIT_PRODUCTS");
+    assert.equal((body.navigationCandidate as Record<string, unknown>).navigationMode, "SPA_PUSH");
+    assert.doesNotMatch(JSON.stringify(body.navigationCandidate), /https?:|\/deposit|selector|xpath|targetElementId|pageIdentity/iu);
+  });
 });

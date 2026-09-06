@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import com.ddd.backend.conversation.overlay.*;
+import com.ddd.backend.conversation.navigation.PendingBrowserNavigation;
 @Component
 public final class ConversationEventStore {
     private final ConcurrentHashMap<String, List<ConversationEvent>> events = new ConcurrentHashMap<>();
@@ -49,6 +50,34 @@ public final class ConversationEventStore {
                 observationId, requestId, target.targetId(), target.pageIdentity(), target.sourceSnapshotId(),
                 resultingSnapshotId, "DOM_CHANGE_CONFIRMED", at);
         events.computeIfAbsent(target.sessionId(), ignored -> new ArrayList<>()).add(event); return event;
+    }
+    public synchronized NavigationRequiredEvent navigationRequired(
+            PendingBrowserNavigation value, String guide, Instant at) {
+        var event = new NavigationRequiredEvent(UUID.randomUUID().toString(),
+                lastSequence(value.sessionId()) + 1, "NAVIGATION_REQUIRED", value.sessionId(),
+                value.navigationId(), value.browserBindingId(), value.sourcePageIdentity(),
+                value.destinationPageIdentity(), value.destinationRoute(), value.routeRevision(),
+                value.navigationMode(), value.expiresAt(), guide, at);
+        events.computeIfAbsent(value.sessionId(), ignored -> new ArrayList<>()).add(event);
+        return event;
+    }
+    public synchronized PageReadyObservedEvent pageReadyObserved(
+            PendingBrowserNavigation value, Instant at) {
+        var event = new PageReadyObservedEvent(UUID.randomUUID().toString(),
+                lastSequence(value.sessionId()) + 1, "PAGE_READY_OBSERVED", value.sessionId(),
+                value.navigationId(), value.browserBindingId(), value.sourcePageIdentity(),
+                value.destinationPageIdentity(), value.routeRevision(), at);
+        events.computeIfAbsent(value.sessionId(), ignored -> new ArrayList<>()).add(event);
+        return event;
+    }
+    public synchronized NavigationClearEvent navigationClear(
+            PendingBrowserNavigation value, Instant at) {
+        var event = new NavigationClearEvent(UUID.randomUUID().toString(),
+                lastSequence(value.sessionId()) + 1, "NAVIGATION_CLEAR", value.sessionId(),
+                value.navigationId(), value.browserBindingId(), value.sourcePageIdentity(),
+                value.destinationPageIdentity(), value.routeRevision(), "REPLACED_OR_CANCELLED", at);
+        events.computeIfAbsent(value.sessionId(), ignored -> new ArrayList<>()).add(event);
+        return event;
     }
     public synchronized long lastSequence(String sessionId) {
         var values = events.get(sessionId); return values == null || values.isEmpty() ? 0 : values.getLast().eventSequence();
