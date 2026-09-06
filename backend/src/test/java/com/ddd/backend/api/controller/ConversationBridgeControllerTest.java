@@ -6,6 +6,7 @@ import com.ddd.backend.conversation.bridge.DemoAgentBridgeAuthenticationExceptio
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeRegistry;
 import com.ddd.backend.domain.session.AutomationSession;
 import com.ddd.backend.service.AutomationSessionService;
+import com.ddd.backend.conversation.overlay.OverlayTargetStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,7 @@ class ConversationBridgeControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean AutomationSessionService sessions;
     @MockitoBean DemoAgentBridgeRegistry bridges;
+    @MockitoBean OverlayTargetStore targets;
 
     private final Instant expiresAt = Instant.parse("2026-09-06T12:00:00Z");
 
@@ -55,6 +57,7 @@ class ConversationBridgeControllerTest {
                         .value("/topic/sessions/session-1/events"))
                 .andExpect(jsonPath("$.data.conversationSnapshotPath")
                         .value("/api/v1/sessions/session-1/conversation"))
+                .andExpect(jsonPath("$.data.activeTarget").doesNotExist())
                 .andExpect(jsonPath("$..bridgeToken").doesNotExist())
                 .andExpect(jsonPath("$..content").doesNotExist());
     }

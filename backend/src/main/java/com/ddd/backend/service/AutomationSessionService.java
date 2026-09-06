@@ -20,6 +20,8 @@ import org.springframework.stereotype.Service;
 import com.ddd.backend.security.secureinput.SecureInputRegistry;
 import com.ddd.backend.conversation.ConversationService;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeService;
+import com.ddd.backend.conversation.overlay.OverlayClearReason;
+import com.ddd.backend.conversation.overlay.OverlayTargetStore;
 
 @Service
 public class AutomationSessionService {
@@ -69,6 +71,7 @@ public class AutomationSessionService {
     private SecureInputRegistry secureInputRegistry;
     private ConversationService conversationService;
     private DemoAgentBridgeService demoAgentBridgeService;
+    private OverlayTargetStore overlayTargets;
 
     @Autowired
     void setSecureInputRegistry(SecureInputRegistry secureInputRegistry) {
@@ -83,6 +86,11 @@ public class AutomationSessionService {
     @Autowired(required = false)
     void setDemoAgentBridgeService(DemoAgentBridgeService demoAgentBridgeService) {
         this.demoAgentBridgeService = demoAgentBridgeService;
+    }
+
+    @Autowired(required = false)
+    void setOverlayTargets(OverlayTargetStore overlayTargets) {
+        this.overlayTargets = overlayTargets;
     }
 
     /*
@@ -511,6 +519,7 @@ public class AutomationSessionService {
         cleanupSecureInputStateSafely(sessionId);
         cleanupConversationStateSafely(sessionId);
         cleanupDemoAgentBridgeSafely(sessionId);
+        cleanupOverlayTargetSafely(sessionId);
 
         /*
          * Playwright BrowserContext / Page 종료.
@@ -595,6 +604,7 @@ public class AutomationSessionService {
         cleanupSecureInputStateSafely(sessionId);
         cleanupConversationStateSafely(sessionId);
         cleanupDemoAgentBridgeSafely(sessionId);
+        cleanupOverlayTargetSafely(sessionId);
 
         /*
          * BrowserContext / Page 종료.
@@ -700,6 +710,14 @@ public class AutomationSessionService {
             if (demoAgentBridgeService != null) demoAgentBridgeService.removeSession(sessionId);
         } catch (RuntimeException ignored) {
             // Bridge cleanup failure must not block session cleanup.
+        }
+    }
+
+    private void cleanupOverlayTargetSafely(String sessionId) {
+        try {
+            if (overlayTargets != null) overlayTargets.removeSession(sessionId);
+        } catch (RuntimeException ignored) {
+            // Overlay cleanup failure must not block session cleanup.
         }
     }
 

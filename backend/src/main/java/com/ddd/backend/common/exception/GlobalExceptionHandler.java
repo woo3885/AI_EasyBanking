@@ -27,6 +27,16 @@ public class GlobalExceptionHandler {
                         "Demo Agent bridge 인증에 실패했습니다."));
     }
 
+    @ExceptionHandler(com.ddd.backend.conversation.overlay.OverlayTargetException.class)
+    public ResponseEntity<ApiResponse<Void>> handleOverlayTarget(
+            com.ddd.backend.conversation.overlay.OverlayTargetException exception
+    ) {
+        var error = exception.error();
+        log.warn("Overlay interaction rejected. errorCode={}", error.name());
+        return ResponseEntity.status(error.status())
+                .body(new ApiResponse<>(false, null, error.name(), error.safeMessage()));
+    }
+
     @ExceptionHandler(com.ddd.backend.conversation.ConversationException.class)
     public ResponseEntity<ApiResponse<Void>> handleConversation(
             com.ddd.backend.conversation.ConversationException exception

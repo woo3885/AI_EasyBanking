@@ -10,6 +10,8 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.ddd.backend.conversation.event.ConversationEventPublisher;
+import com.ddd.backend.conversation.overlay.OverlayClearReason;
+import com.ddd.backend.conversation.overlay.OverlayTargetStore;
 
 /** Day 1 ASK_USER orchestration. It never invokes Browser Action execution. */
 @Service
@@ -21,6 +23,7 @@ public final class ConversationAgentCoordinator {
     private final ConversationAgentContractValidator validator;
     private final ConversationEventPublisher events;
     private ConversationAgentDomDecisionService domDecisionService;
+    private OverlayTargetStore overlayTargets;
 
     public ConversationAgentCoordinator(ConversationService conversations, SessionMessageMailbox mailbox,
             AutomationSessionRepository sessions, ConversationAgentClient client,
@@ -32,6 +35,11 @@ public final class ConversationAgentCoordinator {
     @Autowired(required = false)
     void setDomDecisionService(ConversationAgentDomDecisionService domDecisionService) {
         this.domDecisionService = domDecisionService;
+    }
+
+    @Autowired(required = false)
+    void setOverlayTargets(OverlayTargetStore overlayTargets) {
+        this.overlayTargets = overlayTargets;
     }
 
     public ConversationAgentDecision process(String sessionId, MessageAcceptance acceptance,
@@ -103,6 +111,16 @@ public final class ConversationAgentCoordinator {
             case AUTO_EXECUTE -> WorkflowStatus.AI_EXECUTING;
             default -> throw new IllegalArgumentException("Unsupported latest DOM decision mode");
         };
+        if (overlayTargets != null) {
+            OverlayClearReason reason = switch (decision.mode()) {
+                case SECURE_INPUT_REQUIRED -> OverlayClearReason.SECURE_INPUT;
+                case RISK_WARNING -> OverlayClearReason.RISK_WARNING;
+                case FINAL_CONFIRMATION_REQUIRED -> OverlayClearReason.FINAL_CONFIRMATION;
+                case STOP, COMPLETE -> OverlayClearReason.SESSION_TERMINATED;
+                default -> null;
+            };
+            if (reason != null) overlayTargets.clear(sessionId, reason);
+        }
         session.transitionTo(status);
         sessions.save(session);
         if (decision.message() != null && !decision.message().isBlank()) {

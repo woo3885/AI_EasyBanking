@@ -5,6 +5,7 @@ import com.ddd.backend.common.response.ApiResponse;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeBinding;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeRegistry;
 import com.ddd.backend.service.AutomationSessionService;
+import com.ddd.backend.conversation.overlay.OverlayTargetStore;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -19,13 +20,16 @@ public final class ConversationBridgeController {
 
     private final DemoAgentBridgeRegistry bridges;
     private final AutomationSessionService sessions;
+    private final OverlayTargetStore targets;
 
     public ConversationBridgeController(
             DemoAgentBridgeRegistry bridges,
-            AutomationSessionService sessions
+            AutomationSessionService sessions,
+            OverlayTargetStore targets
     ) {
         this.bridges = bridges;
         this.sessions = sessions;
+        this.targets = targets;
     }
 
     @GetMapping("/bridge")
@@ -39,6 +43,7 @@ public final class ConversationBridgeController {
         DemoAgentBridgeBinding binding = bridges.require(
                 sessionId, bridgeToken, origin, pageIdentity);
         return ApiResponse.success(ConversationBridgeRecoveryResponse.of(
-                binding.sessionId(), binding.pageIdentity(), binding.expiresAt()));
+                binding.sessionId(), binding.pageIdentity(), binding.expiresAt(),
+                targets.active(sessionId, pageIdentity).orElse(null)));
     }
 }
