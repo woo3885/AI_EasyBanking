@@ -195,6 +195,26 @@ h2 {
   font-size: 17px;
 }
 
+.information-card-selected {
+  border-color: #175cd3;
+  box-shadow:
+    0 0 0 3px #d1e9ff,
+    0 8px 24px rgb(16 24 40 / 12%);
+}
+
+.selection-indicator {
+  display: inline-flex;
+  min-height: 36px;
+  margin-top: 16px;
+  padding: 6px 12px;
+  border: 2px solid #175cd3;
+  border-radius: 999px;
+  align-items: center;
+  background: #eff8ff;
+  color: #1849a9;
+  font-weight: 800;
+}
+
 .card-description {
   margin-top: 12px;
   color: #475467;
@@ -222,8 +242,33 @@ h2 {
   opacity: 1;
 }
 
+.primary-button[aria-pressed="true"] {
+  border-color: #067647;
+  background: #067647;
+}
+
+.secondary-button {
+  display: inline-flex;
+  min-height: 52px;
+  padding: 12px 22px;
+  border: 2px solid #475467;
+  border-radius: 10px;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #1d2939;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.secondary-button:hover {
+  background: #f2f4f7;
+}
+
 a:focus-visible,
-button:focus-visible {
+button:focus-visible,
+input:focus-visible {
   outline: 4px solid #fdb022;
   outline-offset: 4px;
 }
@@ -259,6 +304,390 @@ button:focus-visible {
   border-color: #475467;
   background: #ffffff;
   color: #344054;
+}
+
+.next-action-panel {
+  display: flex;
+  margin-top: 28px;
+  padding: 22px;
+  border: 2px solid #98a2b3;
+  border-radius: 14px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  background: #ffffff;
+}
+
+.next-action-panel p {
+  margin: 0;
+  color: #344054;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.next-action-panel .primary-button {
+  width: auto;
+  min-width: 260px;
+}
+
+.deposit-detail-card {
+  max-width: 900px;
+  margin-top: 36px;
+  padding: 32px;
+  border: 2px solid #98a2b3;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgb(16 24 40 / 8%);
+}
+
+.deposit-detail-heading h2 {
+  margin-top: 8px;
+  font-size: 28px;
+}
+
+.deposit-condition-list {
+  display: grid;
+  margin: 28px 0 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.deposit-condition-list > div {
+  padding: 20px;
+  border: 2px solid #d0d5dd;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.deposit-condition-list dt {
+  color: #475467;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.deposit-condition-list dd {
+  margin: 8px 0 0;
+  color: #101828;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.demo-rate-notice {
+  max-width: 900px;
+  margin-top: 28px;
+  padding: 24px;
+  border: 2px solid #b54708;
+  border-radius: 14px;
+  background: #fffaeb;
+  color: #7a2e0e;
+}
+
+.demo-rate-notice h2,
+.demo-rate-notice p {
+  margin: 0;
+}
+
+.demo-rate-notice h2 {
+  color: #7a2e0e;
+}
+
+.demo-rate-notice p {
+  margin-top: 10px;
+  font-size: 17px;
+}
+
+.detail-action-row {
+  display: flex;
+  max-width: 900px;
+  margin-top: 28px;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.detail-action-row .primary-button {
+  width: auto;
+  margin-top: 0;
+}
+
+.deposit-amount-card {
+  max-width: 900px;
+  margin-top: 36px;
+  padding: 32px;
+  border: 2px solid #98a2b3;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgb(16 24 40 / 8%);
+}
+
+.deposit-amount-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.deposit-amount-summary > div {
+  display: flex;
+  min-width: 0;
+  padding: 18px;
+  border: 2px solid #d0d5dd;
+  border-radius: 12px;
+  flex-direction: column;
+  gap: 6px;
+  background: #f8fafc;
+}
+
+.deposit-amount-summary span {
+  color: #475467;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.deposit-amount-summary strong {
+  color: #101828;
+  font-size: 19px;
+}
+
+.deposit-amount-field {
+  margin-top: 28px;
+}
+
+.deposit-amount-field label {
+  display: block;
+  color: #101828;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.deposit-amount-input-row {
+  display: flex;
+  margin-top: 10px;
+  align-items: center;
+  gap: 12px;
+}
+
+.deposit-amount-input-row input {
+  width: min(100%, 460px);
+  min-height: 56px;
+  padding: 12px 16px;
+  border: 2px solid #667085;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #101828;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.deposit-amount-input-row input[aria-invalid="true"] {
+  border-color: #b42318;
+  background: #fff7f6;
+}
+
+.deposit-amount-input-row span {
+  color: #344054;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.formatted-amount {
+  min-height: 30px;
+  margin: 12px 0 0;
+  color: #344054;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.amount-validation {
+  margin: 14px 0 0;
+  padding: 14px 16px;
+  border: 2px solid #1570ef;
+  border-radius: 10px;
+  background: #eff8ff;
+  color: #0b4a8f;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.amount-validation-invalid_format,
+.amount-validation-non_positive,
+.amount-validation-below_minimum,
+.amount-validation-exceeds_balance,
+.amount-validation-unsafe_integer {
+  border-color: #b42318;
+  background: #fef3f2;
+  color: #7a271a;
+}
+
+.amount-validation-valid {
+  border-color: #067647;
+  background: #ecfdf3;
+  color: #05603a;
+}
+
+.deposit-amount-actions {
+  display: flex;
+  margin-top: 28px;
+  gap: 16px;
+}
+
+.deposit-amount-actions .primary-button {
+  width: auto;
+  margin-top: 0;
+}
+
+.deposit-terms-card {
+  max-width: 900px;
+  margin-top: 36px;
+  padding: 32px;
+  border: 2px solid #98a2b3;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgb(16 24 40 / 8%);
+}
+
+.deposit-terms-product-summary {
+  display: grid;
+  padding: 20px;
+  border: 2px solid #d0d5dd;
+  border-radius: 12px;
+  grid-template-columns: minmax(140px, 180px) minmax(0, 1fr);
+  gap: 10px 18px;
+  background: #f8fafc;
+}
+
+.deposit-terms-product-summary span {
+  color: #475467;
+  font-weight: 700;
+}
+
+.deposit-terms-product-summary strong {
+  color: #101828;
+  font-size: 18px;
+}
+
+.deposit-terms-fieldset {
+  min-width: 0;
+  margin: 28px 0 0;
+  padding: 24px;
+  border: 2px solid #667085;
+  border-radius: 14px;
+}
+
+.deposit-terms-fieldset legend {
+  padding: 0 10px;
+  color: #101828;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.deposit-terms-instruction {
+  margin: 0;
+  color: #344054;
+  font-size: 17px;
+}
+
+.deposit-terms-list {
+  display: grid;
+  margin-top: 20px;
+  gap: 14px;
+}
+
+.deposit-term-item {
+  border: 2px solid #98a2b3;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.deposit-term-item:has(input:checked) {
+  border-color: #175cd3;
+  background: #eff8ff;
+}
+
+.deposit-term-label {
+  display: flex;
+  min-height: 72px;
+  padding: 18px;
+  align-items: flex-start;
+  gap: 16px;
+  cursor: pointer;
+}
+
+.deposit-term-label input {
+  width: 24px;
+  height: 24px;
+  margin: 2px 0 0;
+  flex: 0 0 auto;
+  accent-color: #175cd3;
+}
+
+.deposit-term-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.deposit-term-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: #101828;
+  font-size: 18px;
+}
+
+.deposit-term-badge {
+  display: inline-flex;
+  min-height: 30px;
+  padding: 3px 10px;
+  border: 2px solid currentcolor;
+  border-radius: 999px;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.deposit-term-badge-required {
+  color: #b42318;
+}
+
+.deposit-term-badge-optional {
+  color: #175cd3;
+}
+
+.deposit-term-summary {
+  color: #475467;
+  font-size: 16px;
+}
+
+.deposit-terms-status,
+.deposit-terms-confirmation {
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  border: 2px solid #1570ef;
+  border-radius: 10px;
+  background: #eff8ff;
+  color: #0b4a8f;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.deposit-terms-confirmation {
+  border-color: #667085;
+  background: #f8fafc;
+  color: #344054;
+}
+
+.deposit-terms-actions {
+  display: flex;
+  margin-top: 28px;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.deposit-terms-actions .primary-button {
+  width: auto;
+  margin-top: 0;
 }
 
 .detail-list {
@@ -320,6 +749,520 @@ button:focus-visible {
   text-align: center;
 }
 
+.transfer-source-summary {
+  display: grid;
+  max-width: 760px;
+  margin-top: 32px;
+  padding: 24px;
+  border: 2px solid #98a2b3;
+  border-radius: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 24px;
+  background: #ffffff;
+}
+
+.transfer-source-summary > span:first-child {
+  color: #475467;
+  font-weight: 700;
+}
+
+.transfer-source-summary strong {
+  color: #101828;
+  font-size: 20px;
+}
+
+.transfer-source-summary .masked-account-number {
+  margin-top: 0;
+}
+
+.recipient-list-title {
+  margin-top: 36px;
+}
+
+.recipient-list {
+  display: grid;
+  margin: 20px 0 0;
+  padding: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  list-style: none;
+}
+
+.recipient-list-item,
+.recipient-card {
+  min-width: 0;
+  height: 100%;
+}
+
+.recipient-card h3 {
+  margin: 8px 0 0;
+  color: #101828;
+  font-size: 24px;
+  line-height: 1.35;
+}
+
+.recipient-selection-status,
+.recipient-confirmation-status {
+  min-height: 62px;
+  margin: 28px 0 0;
+  padding: 16px 20px;
+  border: 2px solid #1570ef;
+  border-radius: 12px;
+  background: #eff8ff;
+  color: #1849a9;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.recipient-confirmation-status:empty {
+  display: none;
+}
+
+.transfer-recipient-actions {
+  display: flex;
+  max-width: 900px;
+  margin-top: 28px;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.transfer-recipient-actions .primary-button {
+  width: auto;
+  margin-top: 0;
+}
+
+.transfer-amount-card {
+  max-width: 900px;
+  margin-top: 36px;
+  padding: 32px;
+  border: 2px solid #98a2b3;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgb(16 24 40 / 8%);
+}
+
+.transfer-amount-context-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.transfer-amount-context-panel {
+  display: flex;
+  min-width: 0;
+  padding: 20px;
+  border: 2px solid #d0d5dd;
+  border-radius: 12px;
+  flex-direction: column;
+  gap: 8px;
+  background: #f8fafc;
+}
+
+.transfer-amount-context-panel > span:first-child {
+  color: #475467;
+  font-weight: 700;
+}
+
+.transfer-amount-context-panel strong {
+  color: #101828;
+  font-size: 19px;
+}
+
+.transfer-amount-context-panel .masked-account-number {
+  margin-top: 0;
+}
+
+.transfer-amount-confirmation-status {
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  border: 2px solid #067647;
+  border-radius: 10px;
+  background: #ecfdf3;
+  color: #05603a;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.transfer-amount-confirmation-status:empty {
+  display: none;
+}
+
+.transfer-password-card,
+.deposit-password-card {
+  max-width: 900px;
+  margin-top: 36px;
+  padding: 32px;
+  border: 2px solid #98a2b3;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgb(16 24 40 / 8%);
+}
+
+.transfer-password-context-grid,
+.deposit-password-context-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.transfer-password-context-panel,
+.deposit-password-context-panel {
+  display: flex;
+  min-width: 0;
+  padding: 20px;
+  border: 2px solid #d0d5dd;
+  border-radius: 12px;
+  flex-direction: column;
+  gap: 8px;
+  background: #f8fafc;
+}
+
+.transfer-password-context-panel span,
+.deposit-password-context-panel span {
+  color: #475467;
+  font-weight: 700;
+}
+
+.transfer-password-context-panel strong,
+.deposit-password-context-panel strong {
+  color: #101828;
+  font-size: 20px;
+}
+
+.transfer-secure-input-notice,
+.deposit-secure-input-notice {
+  margin-top: 24px;
+  padding: 20px;
+  border: 3px solid #b42318;
+  border-radius: 12px;
+  background: #fef3f2;
+  color: #7a271a;
+}
+
+.transfer-secure-input-notice h2,
+.deposit-secure-input-notice h2 {
+  margin: 0;
+  color: #912018;
+}
+
+.transfer-secure-input-notice p,
+.deposit-secure-input-notice p {
+  margin: 10px 0 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.transfer-password-field,
+.deposit-password-field {
+  margin-top: 28px;
+}
+
+.transfer-password-field label,
+.deposit-password-field label {
+  display: block;
+  margin-bottom: 10px;
+  color: #101828;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.transfer-password-field input,
+.deposit-password-field input {
+  width: min(100%, 440px);
+  min-height: 56px;
+  padding: 12px 16px;
+  border: 2px solid #667085;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #101828;
+  font: inherit;
+  font-size: 20px;
+}
+
+.transfer-password-input-status,
+.transfer-password-completion-status,
+.deposit-password-input-status,
+.deposit-password-completion-status {
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border: 2px solid #1570ef;
+  border-radius: 10px;
+  background: #eff8ff;
+  color: #0b4a8f;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.transfer-password-completion-status,
+.deposit-password-completion-status {
+  border-color: #667085;
+  background: #f8fafc;
+  color: #344054;
+}
+
+.transfer-password-completion-status:empty,
+.deposit-password-completion-status:empty {
+  display: none;
+}
+
+.transfer-password-actions,
+.deposit-password-actions {
+  display: flex;
+  margin-top: 28px;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.transfer-password-actions .primary-button,
+.deposit-password-actions .primary-button {
+  width: auto;
+  margin-top: 0;
+}
+
+.transfer-confirmation-notice {
+  max-width: 900px;
+  margin-top: 28px;
+  padding: 22px;
+  border: 3px solid #b54708;
+  border-radius: 14px;
+  background: #fffaeb;
+  color: #7a2e0e;
+}
+
+.transfer-confirmation-notice h2,
+.transfer-confirmation-notice p {
+  margin: 0;
+}
+
+.transfer-confirmation-notice h2 {
+  color: #7a2e0e;
+}
+
+.transfer-confirmation-notice p {
+  margin-top: 10px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.transfer-confirmation-card {
+  max-width: 900px;
+  margin-top: 28px;
+  padding: 32px;
+  border: 2px solid #98a2b3;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgb(16 24 40 / 8%);
+}
+
+.transfer-confirmation-card > h2 {
+  margin: 0;
+}
+
+.transfer-confirmation-summary {
+  display: grid;
+  margin: 24px 0 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.transfer-confirmation-summary > div {
+  min-width: 0;
+  padding: 20px;
+  border: 2px solid #d0d5dd;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.transfer-confirmation-summary dt {
+  color: #475467;
+  font-weight: 700;
+}
+
+.transfer-confirmation-summary dd {
+  display: flex;
+  margin: 8px 0 0;
+  flex-direction: column;
+  gap: 5px;
+  color: #101828;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.transfer-confirmation-summary .masked-account-number {
+  margin-top: 0;
+}
+
+.transfer-confirmation-amount-status,
+.transfer-final-approval-status {
+  min-height: 62px;
+  margin: 20px 0 0;
+  padding: 16px 18px;
+  border: 2px solid #b54708;
+  border-radius: 12px;
+  background: #fffaeb;
+  color: #7a2e0e;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.transfer-final-confirmation-fieldset {
+  min-width: 0;
+  margin: 24px 0 0;
+  padding: 22px;
+  border: 2px solid #667085;
+  border-radius: 14px;
+}
+
+.transfer-final-confirmation-fieldset legend {
+  padding: 0 10px;
+  color: #101828;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.transfer-final-confirmation-fieldset > p {
+  margin: 14px 0 0;
+  color: #475467;
+  font-size: 16px;
+}
+
+.transfer-final-confirmation-label {
+  display: flex;
+  min-height: 56px;
+  align-items: flex-start;
+  gap: 14px;
+  color: #101828;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.transfer-final-confirmation-label input {
+  width: 26px;
+  height: 26px;
+  margin: 2px 0 0;
+  flex: 0 0 auto;
+  accent-color: #175cd3;
+}
+
+.transfer-final-approval-status {
+  border-color: #667085;
+  background: #f8fafc;
+  color: #344054;
+}
+
+.transfer-final-approval-status:empty {
+  display: none;
+}
+
+.transfer-confirmation-actions {
+  display: flex;
+  margin-top: 28px;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.transfer-confirmation-actions .primary-button {
+  width: auto;
+  margin-top: 0;
+}
+
+.transfer-completion-notice {
+  max-width: 900px;
+  margin-top: 28px;
+  padding: 22px;
+  border: 3px solid #175cd3;
+  border-radius: 14px;
+  background: #eff8ff;
+  color: #0b4a8f;
+}
+
+.transfer-completion-notice h2,
+.transfer-completion-notice p {
+  margin: 0;
+}
+
+.transfer-completion-notice h2 {
+  color: #0b4a8f;
+}
+
+.transfer-completion-notice p {
+  margin-top: 10px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.transfer-completion-card {
+  max-width: 900px;
+  margin-top: 28px;
+  padding: 32px;
+  border: 2px solid #98a2b3;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgb(16 24 40 / 8%);
+}
+
+.transfer-completion-card > h2 {
+  margin: 0;
+}
+
+.transfer-completion-summary {
+  display: grid;
+  margin: 24px 0 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.transfer-completion-summary > div {
+  min-width: 0;
+  padding: 20px;
+  border: 2px solid #d0d5dd;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.transfer-completion-summary dt {
+  color: #475467;
+  font-weight: 700;
+}
+
+.transfer-completion-summary dd {
+  display: flex;
+  margin: 8px 0 0;
+  flex-direction: column;
+  gap: 5px;
+  color: #101828;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.transfer-completion-summary .masked-account-number {
+  margin-top: 0;
+}
+
+.transfer-demo-completion-status {
+  margin: 24px 0 0;
+  padding: 18px;
+  border: 2px solid #067647;
+  border-radius: 12px;
+  background: #ecfdf3;
+  color: #05603a;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.transfer-completion-actions {
+  display: flex;
+  margin-top: 28px;
+}
+
+.transfer-completion-actions .primary-button {
+  width: auto;
+  margin-top: 0;
+}
+
 @media (max-width: 820px) {
   .header-content {
     align-items: stretch;
@@ -331,6 +1274,38 @@ button:focus-visible {
   }
 
   .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .next-action-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .next-action-panel .primary-button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .deposit-condition-list {
+    grid-template-columns: 1fr;
+  }
+
+  .deposit-amount-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .deposit-terms-product-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .transfer-source-summary,
+  .recipient-list,
+  .transfer-amount-context-grid,
+  .transfer-password-context-grid,
+  .deposit-password-context-grid,
+  .transfer-confirmation-summary,
+  .transfer-completion-summary {
     grid-template-columns: 1fr;
   }
 }
@@ -355,9 +1330,54 @@ button:focus-visible {
   }
 
   .information-card,
+  .deposit-detail-card,
+  .deposit-amount-card,
+  .deposit-terms-card,
+  .transfer-amount-card,
+  .transfer-password-card,
+  .deposit-password-card,
+  .transfer-confirmation-card,
+  .transfer-confirmation-notice,
+  .transfer-completion-card,
+  .transfer-completion-notice,
+  .demo-rate-notice,
   .warning-box,
   .not-found-panel {
     padding: 22px;
+  }
+
+  .detail-action-row .secondary-button {
+    width: 100%;
+  }
+
+  .detail-action-row,
+  .deposit-amount-actions,
+  .deposit-terms-actions,
+  .transfer-recipient-actions,
+  .transfer-password-actions,
+  .deposit-password-actions,
+  .transfer-confirmation-actions,
+  .transfer-completion-actions {
+    flex-direction: column;
+  }
+
+  .detail-action-row .primary-button,
+  .deposit-amount-actions .primary-button,
+  .deposit-amount-actions .secondary-button,
+  .deposit-terms-actions .primary-button,
+  .deposit-terms-actions .secondary-button,
+  .transfer-recipient-actions .primary-button,
+  .transfer-recipient-actions .secondary-button,
+  .transfer-amount-actions .primary-button,
+  .transfer-amount-actions .secondary-button,
+  .transfer-password-actions .primary-button,
+  .transfer-password-actions .secondary-button,
+  .deposit-password-actions .primary-button,
+  .deposit-password-actions .secondary-button,
+  .transfer-confirmation-actions .primary-button,
+  .transfer-confirmation-actions .secondary-button,
+  .transfer-completion-actions .primary-button {
+    width: 100%;
   }
 
   .detail-list > div {

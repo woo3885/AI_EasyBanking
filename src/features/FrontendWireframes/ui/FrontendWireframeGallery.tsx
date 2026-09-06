@@ -144,7 +144,9 @@ function getAppLayoutProps(state: FrontendScreenState) {
     screenType: state.screenType,
     message: state.message,
     isConnected: state.isConnected,
-    isLoading: state.isLoading
+    isLoading: state.isLoading,
+    showDeveloperStatus: true,
+    fixedAspectRatio: true
   };
 }
 

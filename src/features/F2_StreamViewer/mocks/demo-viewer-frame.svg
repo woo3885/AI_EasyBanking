@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title description">
+  <title id="title">금융길잡이 데모 화면</title>
+  <desc id="description">프론트 Viewer 테스트를 위한 가상 금융 화면</desc>
+  <rect width="1280" height="720" fill="#f1f5f9" />
+  <rect width="1280" height="92" fill="#1e3a8a" />
+  <text x="64" y="58" fill="#ffffff" font-family="sans-serif" font-size="30" font-weight="700">금융길잡이 데모 화면</text>
+  <rect x="64" y="140" width="1152" height="496" rx="24" fill="#ffffff" stroke="#94a3b8" stroke-width="3" />
+  <text x="112" y="220" fill="#0f172a" font-family="sans-serif" font-size="36" font-weight="700">원격 화면 Viewer 테스트</text>
+  <text x="112" y="272" fill="#334155" font-family="sans-serif" font-size="24">실제 금융정보가 없는 프론트 전용 Mock 프레임입니다.</text>
+  <rect x="112" y="326" width="480" height="216" rx="18" fill="#eff6ff" stroke="#60a5fa" stroke-width="3" />
+  <rect x="640" y="326" width="464" height="216" rx="18" fill="#f8fafc" stroke="#94a3b8" stroke-width="3" />
+  <text x="152" y="397" fill="#1e3a8a" font-family="sans-serif" font-size="26" font-weight="700">데모 업무 영역</text>
+  <text x="152" y="447" fill="#334155" font-family="sans-serif" font-size="21">테스트 화면 · 외부 네트워크 미사용</text>
+  <text x="680" y="397" fill="#0f172a" font-family="sans-serif" font-size="26" font-weight="700">안전 안내</text>
+  <text x="680" y="447" fill="#334155" font-family="sans-serif" font-size="21">개인정보와 실제 거래정보 없음</text>
+  <text x="112" y="600" fill="#64748b" font-family="sans-serif" font-size="18">개발자 B의 실제 캡처가 아닌 프론트 테스트용 이미지입니다.</text>
+</svg>

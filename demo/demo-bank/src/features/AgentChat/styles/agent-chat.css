@@ -1,0 +1,372 @@
+.demo-bank-agent-workspace {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  align-items: start;
+  gap: 20px;
+  padding: 0 20px 20px;
+}
+
+.demo-bank-agent-workspace > .site-shell {
+  min-width: 0;
+  border-right: 1px solid #cbd5e1;
+  border-left: 1px solid #cbd5e1;
+  background: #eef2f6;
+}
+
+.agent-chat-shell {
+  position: sticky;
+  top: 16px;
+  min-width: 0;
+  margin-top: 16px;
+}
+
+.agent-chat-toggle,
+.agent-submit-button,
+.agent-quick-requests button,
+.agent-message-warning button {
+  min-height: 56px;
+  padding: 12px 18px;
+  border: 2px solid #175cd3;
+  border-radius: 10px;
+  background: #175cd3;
+  color: #ffffff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.agent-connection-status {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border: 2px solid #667085;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #1d2939;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.agent-protection-notice {
+  padding: 12px 14px;
+  border: 2px solid #b42318;
+  border-radius: 10px;
+  background: #fef3f2;
+  color: #7a271a;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.agent-message-speech,
+.agent-speech-stop,
+.agent-reconnect-button,
+.agent-voice-actions button {
+  min-height: 48px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border: 2px solid #475467;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #1d2939;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.agent-voice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.agent-message-speech:disabled,
+.agent-voice-actions button:disabled {
+  color: #475467;
+  background: #e4e7ec;
+  cursor: not-allowed;
+}
+
+.agent-chat-toggle {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.agent-chat-panel {
+  padding: 22px;
+  border: 2px solid #667085;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgb(16 24 40 / 12%);
+}
+
+.agent-chat-heading p,
+.agent-message-heading,
+.agent-message p,
+.agent-empty-message,
+.agent-submit-status,
+.agent-message-warning p,
+.agent-composer-guide,
+.agent-composer-validation,
+.agent-composer-ready,
+.agent-quick-requests p {
+  margin: 0;
+}
+
+.agent-chat-heading h2 {
+  margin: 6px 0 10px;
+  font-size: 28px;
+}
+
+.agent-chat-heading > p:last-child,
+.agent-empty-message,
+.agent-message p,
+.agent-composer-guide,
+.agent-composer-validation,
+.agent-composer-ready,
+.agent-quick-requests p {
+  color: #344054;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.agent-chat-kicker {
+  color: #175cd3;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.agent-section-title {
+  margin: 24px 0 12px;
+  font-size: 20px;
+}
+
+.agent-empty-message {
+  padding: 18px;
+  border: 2px dashed #98a2b3;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.agent-message-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: 12px;
+  list-style: none;
+}
+
+.agent-message article {
+  padding: 16px;
+  border: 2px solid #98a2b3;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.agent-message-user article {
+  border-color: #175cd3;
+  background: #eff8ff;
+}
+
+.agent-message-heading {
+  display: flex;
+  margin-bottom: 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #344054;
+  font-size: 14px;
+}
+
+.agent-message-heading strong {
+  color: #101828;
+  font-size: 16px;
+}
+
+.agent-submit-status,
+.agent-message-warning,
+.agent-composer-validation,
+.agent-composer-ready {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 2px solid #1570ef;
+  border-radius: 10px;
+  background: #eff8ff;
+  color: #0b4a8f;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.agent-message-warning {
+  border-color: #b42318;
+  background: #fef3f2;
+  color: #7a271a;
+}
+
+.agent-message-warning button {
+  min-height: 48px;
+  margin-top: 12px;
+  border-color: #b42318;
+  background: #ffffff;
+  color: #7a271a;
+}
+
+.agent-quick-requests {
+  margin-top: 20px;
+}
+
+.agent-quick-requests > div {
+  display: grid;
+  margin-top: 10px;
+  gap: 10px;
+}
+
+.agent-quick-requests button {
+  min-height: 48px;
+  border-color: #475467;
+  background: #ffffff;
+  color: #1d2939;
+  text-align: left;
+}
+
+.agent-composer {
+  display: grid;
+  margin-top: 22px;
+  gap: 10px;
+}
+
+.agent-composer label {
+  color: #101828;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.agent-composer textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 14px;
+  resize: vertical;
+  border: 2px solid #667085;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #101828;
+  font: inherit;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.agent-submit-button:disabled,
+.agent-quick-requests button:disabled {
+  border-color: #98a2b3;
+  background: #e4e7ec;
+  color: #475467;
+  cursor: not-allowed;
+}
+
+.agent-chat-toggle:hover:not(:disabled),
+.agent-submit-button:hover:not(:disabled) {
+  background: #1849a9;
+}
+
+.agent-quick-requests button:hover:not(:disabled) {
+  background: #f2f4f7;
+}
+
+.agent-chat-shell button:focus-visible,
+.agent-chat-shell textarea:focus-visible,
+.agent-message-speech:focus-visible,
+.agent-speech-stop:focus-visible,
+.agent-reconnect-button:focus-visible,
+.agent-voice-actions button:focus-visible {
+  outline: 4px solid #fdb022;
+  outline-offset: 4px;
+}
+
+.agent-chat-shell-closed {
+  max-width: 380px;
+  justify-self: end;
+}
+
+.dom-target-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.dom-target-highlight {
+  position: fixed;
+  box-sizing: border-box;
+  border: 4px solid #b54708;
+  border-radius: 12px;
+  box-shadow: 0 0 0 5px rgb(253 176 34 / 38%);
+  background: rgb(255 250 235 / 18%);
+}
+
+.dom-target-guide {
+  position: fixed;
+  display: grid;
+  width: min(320px, calc(100vw - 24px));
+  gap: 4px;
+  padding: 12px 14px;
+  border: 3px solid #b54708;
+  border-radius: 12px;
+  background: #fffaeb;
+  color: #7a2e0e;
+  box-shadow: 0 8px 18px rgb(16 24 40 / 18%);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.dom-target-guide strong {
+  font-size: 18px;
+}
+
+.dom-target-role {
+  font-weight: 700;
+}
+
+@media (max-width: 960px) {
+  .demo-bank-agent-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0;
+  }
+
+  .demo-bank-agent-workspace > .site-shell {
+    border: 0;
+  }
+
+  .agent-chat-shell {
+    position: static;
+    width: min(100% - 40px, 1180px);
+    margin: 0 auto 24px;
+  }
+
+  .agent-chat-shell-closed {
+    justify-self: stretch;
+  }
+}
+
+@media (max-width: 560px) {
+  .agent-chat-shell {
+    width: min(100% - 28px, 1180px);
+  }
+
+  .agent-chat-panel {
+    padding: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-chat-shell *,
+  .agent-chat-shell *::before,
+  .agent-chat-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

@@ -44,6 +44,9 @@ export const depositProducts: DepositProduct[] = [
   }
 ];
 
+/** D25·D27 정기예금 공동 시나리오에서 사용자가 명시한 Demo 가입 금액. */
+export const DEMO_DEPOSIT_CONFIRMATION_AMOUNT = 1_000_000;
+
 export const demoAccounts: DemoAccount[] = [
   {
     id: 'living-expense',

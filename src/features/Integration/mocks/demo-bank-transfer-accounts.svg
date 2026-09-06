@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title description">
+  <title id="title">D16 Integration Mock 계좌 선택 화면</title>
+  <desc id="description">생활비 계좌와 저축 계좌를 표시하는 로컬 개발용 그림입니다.</desc>
+  <rect width="1280" height="720" fill="#e2e8f0"/>
+  <rect x="40" y="32" width="1200" height="656" rx="24" fill="#ffffff" stroke="#475569" stroke-width="4"/>
+  <rect x="40" y="32" width="1200" height="92" rx="24" fill="#0f172a"/>
+  <text x="84" y="88" fill="#ffffff" font-family="sans-serif" font-size="30" font-weight="700">D16 Integration Mock</text>
+  <text x="84" y="176" fill="#0f172a" font-family="sans-serif" font-size="34" font-weight="700">Mock 출금 계좌 선택</text>
+  <text x="84" y="216" fill="#475569" font-family="sans-serif" font-size="21">실제 데모사이트 화면이나 고객 계좌가 아닙니다.</text>
+  <rect x="120" y="260" width="480" height="250" rx="20" fill="#eff6ff" stroke="#2563eb" stroke-width="4"/>
+  <text x="160" y="316" fill="#0f172a" font-family="sans-serif" font-size="28" font-weight="700">생활비 계좌</text>
+  <text x="160" y="358" fill="#475569" font-family="sans-serif" font-size="20">로컬 Mock 계좌 항목</text>
+  <rect x="348" y="408" width="212" height="64" rx="14" fill="#2563eb"/>
+  <text x="386" y="449" fill="#ffffff" font-family="sans-serif" font-size="22" font-weight="700">직접 선택</text>
+  <rect x="680" y="260" width="480" height="250" rx="20" fill="#f8fafc" stroke="#64748b" stroke-width="3"/>
+  <text x="720" y="316" fill="#0f172a" font-family="sans-serif" font-size="28" font-weight="700">저축 계좌</text>
+  <text x="720" y="358" fill="#475569" font-family="sans-serif" font-size="20">로컬 Mock 계좌 항목</text>
+  <rect x="908" y="408" width="212" height="64" rx="14" fill="#475569"/>
+  <text x="946" y="449" fill="#ffffff" font-family="sans-serif" font-size="22" font-weight="700">직접 선택</text>
+  <rect x="120" y="558" width="1040" height="78" rx="16" fill="#fef3c7" stroke="#b45309" stroke-width="3"/>
+  <text x="160" y="607" fill="#78350f" font-family="sans-serif" font-size="21" font-weight="700">로컬 fixture이며 실제 금융거래나 브라우저 조작이 발생하지 않습니다.</text>
+</svg>

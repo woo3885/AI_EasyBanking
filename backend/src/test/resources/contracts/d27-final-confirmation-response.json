@@ -1,0 +1,18 @@
+{
+  "actionType": "REQUEST_FINAL_CONFIRMATION",
+  "elementId": null,
+  "value": null,
+  "scrollX": null,
+  "scrollY": null,
+  "waitMillis": null,
+  "status": "FINAL_CONFIRMATION_REQUIRED",
+  "message": "예금 가입 전 최종 확인이 필요합니다.",
+  "requiresUserAction": true,
+  "executionBlocked": true,
+  "decisionType": null,
+  "sourceSnapshotId": "snap-example",
+  "options": [],
+  "terms": [],
+  "confirmationType": "DEPOSIT_SUBSCRIPTION",
+  "confirmationTargetElementId": "el-example-001"
+}

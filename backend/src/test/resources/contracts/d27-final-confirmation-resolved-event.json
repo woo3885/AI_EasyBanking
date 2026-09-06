@@ -1,0 +1,18 @@
+{
+  "eventId": "evt-002",
+  "eventSequence": 22,
+  "eventType": "CONFIRMATION_RESOLVED",
+  "sessionId": "session-001",
+  "status": "PAGE_LOADING",
+  "message": "최종 실행이 승인되었습니다.",
+  "actionRequired": false,
+  "confirmation": {
+    "confirmationId": "confirm-001",
+    "confirmationType": "DEPOSIT_SUBSCRIPTION",
+    "sourceSnapshotId": "snap-001",
+    "frameId": "frm-001",
+    "frameSequence": 7,
+    "summary": null
+  },
+  "occurredAt": "2026-08-27T00:00:01Z"
+}

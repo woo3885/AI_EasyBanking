@@ -1,0 +1,7 @@
+{
+  "requestId": "req-reject-001",
+  "confirmationId": "confirm-001",
+  "approved": false,
+  "expectedFrameId": "frm-001",
+  "expectedSequence": 7
+}

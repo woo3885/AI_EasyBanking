@@ -1,0 +1,3 @@
+export const VIEWER_FRAME_WIDTH = 1280;
+export const VIEWER_FRAME_HEIGHT = 720;
+export const VIEWER_FRAME_ASPECT_RATIO = 16 / 9;

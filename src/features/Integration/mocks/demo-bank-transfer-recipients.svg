@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title description">
+  <title id="title">D16 Integration Mock 수취인 선택 대기 화면</title>
+  <desc id="description">두 개의 개발용 Mock 수취인 카드를 표시하는 로컬 그림입니다.</desc>
+  <rect width="1280" height="720" fill="#dbeafe"/>
+  <rect x="40" y="32" width="1200" height="656" rx="24" fill="#ffffff" stroke="#1e3a8a" stroke-width="4"/>
+  <rect x="40" y="32" width="1200" height="92" rx="24" fill="#1e3a8a"/>
+  <text x="84" y="88" fill="#ffffff" font-family="sans-serif" font-size="30" font-weight="700">D16 Integration Mock · 기준 시나리오 도달</text>
+  <text x="84" y="176" fill="#0f172a" font-family="sans-serif" font-size="34" font-weight="700">Mock 수취인 선택 대기</text>
+  <text x="84" y="216" fill="#475569" font-family="sans-serif" font-size="21">실제 고객정보가 아니며 D16에서는 선택을 진행하지 않습니다.</text>
+  <rect x="120" y="250" width="480" height="242" rx="20" fill="#f0fdf4" stroke="#15803d" stroke-width="4"/>
+  <circle cx="180" cy="320" r="32" fill="#15803d"/>
+  <text x="230" y="318" fill="#0f172a" font-family="sans-serif" font-size="27" font-weight="700">Mock 수취인 홍길동</text>
+  <text x="230" y="352" fill="#475569" font-family="sans-serif" font-size="19">개발용 공개 표시 항목</text>
+  <rect x="348" y="390" width="212" height="64" rx="14" fill="#15803d"/>
+  <text x="386" y="431" fill="#ffffff" font-family="sans-serif" font-size="22" font-weight="700">선택 위치</text>
+  <rect x="680" y="250" width="480" height="242" rx="20" fill="#f8fafc" stroke="#64748b" stroke-width="3"/>
+  <circle cx="740" cy="320" r="32" fill="#64748b"/>
+  <text x="790" y="318" fill="#0f172a" font-family="sans-serif" font-size="27" font-weight="700">Mock 저장 수취인</text>
+  <text x="790" y="352" fill="#475569" font-family="sans-serif" font-size="19">개발용 공개 표시 항목</text>
+  <rect x="120" y="540" width="1040" height="96" rx="16" fill="#ecfeff" stroke="#0e7490" stroke-width="3"/>
+  <text x="160" y="580" fill="#164e63" font-family="sans-serif" font-size="22" font-weight="700">수취인 선택 대기 상태가 D16 Preview의 기준점입니다.</text>
+  <text x="160" y="613" fill="#164e63" font-family="sans-serif" font-size="18">선택 제출, 화면 이동, 금융 처리는 수행하지 않습니다.</text>
+</svg>

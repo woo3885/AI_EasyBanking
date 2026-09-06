@@ -7,14 +7,27 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "server": "tsx src/server.ts",
+    "server:dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "tsx --test src/tests/agentLoop.test.ts src/tests/agentSecureInput.test.ts src/tests/agentUserDecision.test.ts src/tests/aiResponseParser.test.ts src/tests/aiResponseValidator.test.ts src/tests/d23BackendContract.test.ts src/tests/d24DecisionResponseContract.test.ts src/tests/d24UserDecision.test.ts src/tests/d25DepositScenario.test.ts src/tests/secureInputPrompt.test.ts src/tests/stability.test.ts src/tests/structuredActionService.test.ts src/tests/targetAccuracy.test.ts",
+    "test:d23": "tsx --test src/tests/d23BackendContract.test.ts",
+    "test:d24": "tsx --test src/tests/d24DecisionResponseContract.test.ts src/tests/d24UserDecision.test.ts",
+    "test:d24:response": "tsx --test src/tests/d24DecisionResponseContract.test.ts",
+    "test:d25": "tsx --test src/tests/d25DepositScenario.test.ts",
+    "test:d26": "tsx --test src/tests/d26SecureInputEvaluation.test.ts",
+    "test:live": "tsx --test src/tests/geminiApi.test.ts src/tests/geminiStructuredOutput.test.ts"
   },
   "dependencies": {
-    "@google/genai": "^1.0.0",
-    "dotenv": "^17.0.0"
+    "@google/genai": "^1.52.0",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^24.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"

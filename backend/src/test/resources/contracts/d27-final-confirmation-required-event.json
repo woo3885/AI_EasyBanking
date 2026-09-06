@@ -1,0 +1,25 @@
+{
+  "eventId": "evt-001",
+  "eventSequence": 21,
+  "eventType": "CONFIRMATION_REQUIRED",
+  "sessionId": "session-001",
+  "status": "FINAL_CONFIRMATION_REQUIRED",
+  "message": "예금 가입 전 최종 확인이 필요합니다.",
+  "actionRequired": true,
+  "confirmation": {
+    "confirmationId": "confirm-001",
+    "confirmationType": "DEPOSIT_SUBSCRIPTION",
+    "sourceSnapshotId": "snap-001",
+    "frameId": "frm-001",
+    "frameSequence": 7,
+    "summary": {
+      "transactionType": "정기예금 가입",
+      "items": [
+        {"id": "product-name", "label": "상품명", "value": "정기예금"},
+        {"id": "deposit-amount", "label": "가입 금액", "value": "1,000,000원"},
+        {"id": "deposit-period", "label": "가입 기간", "value": "12개월"}
+      ]
+    }
+  },
+  "occurredAt": "2026-08-27T00:00:00Z"
+}
