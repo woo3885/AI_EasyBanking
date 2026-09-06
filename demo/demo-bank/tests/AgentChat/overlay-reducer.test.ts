@@ -5,10 +5,13 @@ import { createInitialConversationState, type OverlayTargetEvent } from '../../s
 
 const targetEvent: OverlayTargetEvent = {
   eventId: 'event-10', eventSequence: 10, eventType: 'OVERLAY_TARGET',
+  contractVersion: 2, materializationMode: 'USER_DOM_PUBLIC_TARGET',
   sessionId: 'session-1', workflowStatus: 'USER_DECISION_REQUIRED', targetId: 'target-1',
   pageIdentity: 'page-1', sourceSnapshotId: 'snap-1', coordinateSpace: 'VIEWPORT_CSS_PX',
   rectangle: { x: 10, y: 20, width: 100, height: 50 }, viewport: { width: 1280, height: 720 },
   role: 'button', label: '선택', guide: '버튼을 눌러 주세요.', actionMode: 'GUIDE_USER_CLICK',
+  locator: { type: 'PUBLIC_TARGET_KEY', publicTargetKey: 'deposit-product-12m-select',
+    role: 'button', accessibleName: '선택' },
   expiresAt: '2099-01-01T00:00:00Z', occurredAt: '2026-09-06T12:00:00Z'
 };
 
@@ -37,17 +40,20 @@ describe('Overlay conversation state', () => {
     const state = withTarget();
     const foreign = conversationReducer(state, { type: 'SERVER_EVENT_RECEIVED', event: {
       eventId: 'event-11', eventSequence: 11, eventType: 'OVERLAY_CLEAR', sessionId: 'session-1',
-      targetId: 'target-2', pageIdentity: 'page-1', sourceSnapshotId: 'snap-1', reason: 'REPLACED',
+      targetId: 'target-2', pageIdentity: 'page-1', sourceSnapshotId: 'snap-1',
+      publicTargetKey: 'deposit-product-12m-select', reason: 'REPLACED',
       occurredAt: '2026-09-06T12:01:00Z'
     } });
     expect(foreign.activeTarget?.targetId).toBe('target-1');
 
     const observing = conversationReducer(foreign, { type: 'OBSERVATION_STARTED', observation: {
-      requestId: 'request-1', targetId: 'target-1', pageIdentity: 'page-1', sourceSnapshotId: 'snap-1'
+      requestId: 'request-1', targetId: 'target-1', pageIdentity: 'page-1', sourceSnapshotId: 'snap-1',
+      publicTargetKey: 'deposit-product-12m-select'
     } });
     const cleared = conversationReducer(observing, { type: 'SERVER_EVENT_RECEIVED', event: {
       eventId: 'event-12', eventSequence: 12, eventType: 'OVERLAY_CLEAR', sessionId: 'session-1',
-      targetId: 'target-1', pageIdentity: 'page-1', sourceSnapshotId: 'snap-1', reason: 'USER_ACTION',
+      targetId: 'target-1', pageIdentity: 'page-1', sourceSnapshotId: 'snap-1',
+      publicTargetKey: 'deposit-product-12m-select', reason: 'USER_ACTION',
       occurredAt: '2026-09-06T12:01:01Z'
     } });
     expect(cleared.activeTarget).toBeNull();
@@ -78,7 +84,8 @@ describe('Overlay conversation state', () => {
     '%s 상태에서 target과 pending observation을 제거한다', (workflowStatus) => {
       let state = withTarget();
       state = conversationReducer(state, { type: 'OBSERVATION_STARTED', observation: {
-        requestId: 'request-1', targetId: 'target-1', pageIdentity: 'page-1', sourceSnapshotId: 'snap-1'
+        requestId: 'request-1', targetId: 'target-1', pageIdentity: 'page-1',
+        sourceSnapshotId: 'snap-1', publicTargetKey: 'deposit-product-12m-select'
       } });
       state = conversationReducer(state, { type: 'SERVER_EVENT_RECEIVED', event: {
         eventId: `event-${workflowStatus}`, eventSequence: 11, eventType: 'AI_MESSAGE', sessionId: 'session-1',
@@ -93,21 +100,24 @@ describe('Overlay conversation state', () => {
   it('202 ACK는 대기 상태만 만들고 observed identity가 일치해야 완료한다', () => {
     let state = withTarget();
     state = conversationReducer(state, { type: 'OBSERVATION_STARTED', observation: {
-      requestId: 'request-1', targetId: 'target-1', pageIdentity: 'page-1', sourceSnapshotId: 'snap-1'
+      requestId: 'request-1', targetId: 'target-1', pageIdentity: 'page-1', sourceSnapshotId: 'snap-1',
+      publicTargetKey: 'deposit-product-12m-select'
     } });
     state = conversationReducer(state, { type: 'OBSERVATION_ACKNOWLEDGED', requestId: 'request-1', targetId: 'target-1' });
     expect(state.observationPhase).toBe('WAITING_FOR_RESULT');
     const foreign = conversationReducer(state, { type: 'SERVER_EVENT_RECEIVED', event: {
       eventId: 'event-11', eventSequence: 11, eventType: 'USER_ACTION_OBSERVED', sessionId: 'session-1',
       workflowStatus: 'AI_EXECUTING', observationId: 'observation-2', requestId: 'other', targetId: 'target-1',
-      pageIdentity: 'page-1', sourceSnapshotId: 'snap-1', resultingSnapshotId: 'snap-2',
+      pageIdentity: 'page-1', sourceSnapshotId: 'snap-1', publicTargetKey: 'deposit-product-12m-select',
+      resultingSnapshotId: 'snap-2',
       status: 'DOM_CHANGE_CONFIRMED', occurredAt: '2026-09-06T12:01:00Z'
     } });
     expect(foreign.observationPhase).toBe('WAITING_FOR_RESULT');
     const completed = conversationReducer(foreign, { type: 'SERVER_EVENT_RECEIVED', event: {
       eventId: 'event-12', eventSequence: 12, eventType: 'USER_ACTION_OBSERVED', sessionId: 'session-1',
       workflowStatus: 'AI_EXECUTING', observationId: 'observation-1', requestId: 'request-1', targetId: 'target-1',
-      pageIdentity: 'page-1', sourceSnapshotId: 'snap-1', resultingSnapshotId: 'snap-2',
+      pageIdentity: 'page-1', sourceSnapshotId: 'snap-1', publicTargetKey: 'deposit-product-12m-select',
+      resultingSnapshotId: 'snap-2',
       status: 'DOM_CHANGE_CONFIRMED', occurredAt: '2026-09-06T12:01:01Z'
     } });
     expect(completed.observationPhase).toBe('IDLE');

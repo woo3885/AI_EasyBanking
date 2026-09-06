@@ -2,11 +2,13 @@ import type {
   OverlayActionMode,
   OverlayClearReason,
   OverlayCoordinateSpace,
+  OverlayMaterializationMode,
   OverlayObservationPhase,
   OverlayRectangle,
   OverlayViewport,
   PendingOverlayObservation,
-  PublicOverlayTarget
+  PublicOverlayTarget,
+  PublicTargetLocator
 } from './overlay-types';
 import type { PendingBrowserNavigation } from './navigation-types';
 
@@ -159,6 +161,8 @@ export interface AiMessageEvent extends ConversationEventBase {
 export interface OverlayTargetEvent extends ConversationEventBase {
   eventType: 'OVERLAY_TARGET';
   workflowStatus: 'USER_DECISION_REQUIRED';
+  contractVersion: 1 | 2;
+  materializationMode: OverlayMaterializationMode;
   targetId: string;
   pageIdentity: string;
   sourceSnapshotId: string;
@@ -168,6 +172,7 @@ export interface OverlayTargetEvent extends ConversationEventBase {
   role: string;
   label: string;
   guide: string;
+  locator: PublicTargetLocator | null;
   actionMode: OverlayActionMode;
   expiresAt: string;
 }
@@ -180,6 +185,7 @@ export interface OverlayClearEvent {
   targetId: string;
   pageIdentity: string;
   sourceSnapshotId: string;
+  publicTargetKey: string | null;
   reason: OverlayClearReason;
   occurredAt: string;
 }
@@ -192,6 +198,7 @@ export interface UserActionObservedEvent extends ConversationEventBase {
   targetId: string;
   pageIdentity: string;
   sourceSnapshotId: string;
+  publicTargetKey: string | null;
   resultingSnapshotId: string;
   status: 'DOM_CHANGE_CONFIRMED';
 }

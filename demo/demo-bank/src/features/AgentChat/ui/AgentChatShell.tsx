@@ -28,7 +28,7 @@ export default function AgentChatShell(props: AgentChatShellProps) {
     onSensitive: () => dispatch({ type: 'SAFE_ERROR_SET', error: CHAT_SENSITIVE_ERROR })
   });
   const speechSynthesis = useAgentSpeechSynthesis(!protection.canPlayTts, state.sessionId);
-  useDomTargetOverlay({
+  const { materializedTarget } = useDomTargetOverlay({
     target: protection.canShowOverlay ? state.activeTarget : null,
     observationPhase: state.observationPhase,
     onClear: clearOverlay,
@@ -72,8 +72,11 @@ export default function AgentChatShell(props: AgentChatShellProps) {
           </div>
         ) : null}
       </aside>
-      {protection.canShowOverlay && state.activeTarget ? (
-        <DomTargetOverlay target={state.activeTarget} observationPhase={state.observationPhase} />
+      {protection.canShowOverlay && materializedTarget ? (
+        <DomTargetOverlay
+          materializedTarget={materializedTarget}
+          observationPhase={state.observationPhase}
+        />
       ) : null}
     </>
   );

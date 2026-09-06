@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ConversationHttpClient } from '../../src/features/AgentChat/api/conversation-http-client';
 import type { OverlayHttpClient } from '../../src/features/AgentChat/api/overlay-http-client';
@@ -20,11 +20,14 @@ class FakeRecognition {
 }
 
 const target: PublicOverlayTarget = {
+  contractVersion: 2, materializationMode: 'USER_DOM_PUBLIC_TARGET',
   targetId: 'target-1', sessionId: 'session-1', pageIdentity: 'page-1',
   sourceSnapshotId: 'snapshot-1', coordinateSpace: 'VIEWPORT_CSS_PX',
   rectangle: { x: 100, y: 200, width: 180, height: 56 },
   viewport: { width: window.innerWidth, height: window.innerHeight },
   role: 'button', label: '12개월 정기예금 선택', guide: '이 버튼을 직접 눌러 주세요.',
+  locator: { type: 'PUBLIC_TARGET_KEY', publicTargetKey: 'deposit-product-12m-select',
+    role: 'button', accessibleName: '12개월 정기예금 선택' },
   actionMode: 'GUIDE_USER_CLICK', createdAt: '2026-09-06T00:00:00Z',
   expiresAt: '2099-09-06T00:01:00Z', consumedAt: null
 };
@@ -60,9 +63,25 @@ function dependencies(observeClick: OverlayHttpClient['observeClick']) {
   return { stompClient, httpClient, overlayHttpClient, disconnect, handlers: () => handlers };
 }
 
+function PublicTargetButton() {
+  return <button type="button" data-testid="actual-target"
+    data-ddd-public-target="deposit-product-12m-select"
+    aria-label="12개월 정기예금 선택">이 상품 선택</button>;
+}
+
+beforeEach(() => {
+  window.history.replaceState(null, '', '/deposit/products');
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({
+    x: 100, y: 200, left: 100, top: 200, width: 180, height: 56,
+    right: 280, bottom: 256, toJSON: () => ({})
+  } as DOMRect));
+});
+
 afterEach(() => {
   delete (window as typeof window & { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
   recognitionInstance = null;
+  vi.restoreAllMocks();
+  window.history.replaceState(null, '', '/');
 });
 
 describe('AgentChat protected lifecycle integration', () => {
@@ -109,7 +128,7 @@ describe('AgentChat protected lifecycle integration', () => {
     });
     const setup = dependencies(observeClick);
     render(<div>
-      <button type="button" data-testid="actual-target">이 상품 선택</button>
+      <PublicTargetButton />
       <AgentChatShell httpClient={setup.httpClient} overlayHttpClient={setup.overlayHttpClient}
         stompClient={setup.stompClient}
         bridgeBinding={{ sessionId: 'session-1', browserBindingId: 'binding-1', bridgeToken: 'token-1',
@@ -119,8 +138,6 @@ describe('AgentChat protected lifecycle integration', () => {
     await waitFor(() => expect(setup.overlayHttpClient.recoverBridge).toHaveBeenCalledTimes(1));
     await act(async () => setup.handlers().onConnected());
     const button = await screen.findByTestId('actual-target');
-    button.getBoundingClientRect = () => ({ x: 100, y: 200, left: 100, top: 200,
-      width: 180, height: 56, right: 280, bottom: 256, toJSON: () => ({}) });
     fireEvent.click(button, { clientX: 110, clientY: 210, detail: 1 });
     await waitFor(() => expect(observeClick).toHaveBeenCalledTimes(1));
 
@@ -141,11 +158,11 @@ describe('AgentChat protected lifecycle integration', () => {
 
   it('reconnect restores snapshot first and then only the current bridge target without auto requests', async () => {
     const setup = dependencies(vi.fn());
-    render(<AgentChatShell httpClient={setup.httpClient} overlayHttpClient={setup.overlayHttpClient}
-      stompClient={setup.stompClient}
+    render(<div><PublicTargetButton /><AgentChatShell httpClient={setup.httpClient}
+      overlayHttpClient={setup.overlayHttpClient} stompClient={setup.stompClient}
       bridgeBinding={{ sessionId: 'session-1', browserBindingId: 'binding-1', bridgeToken: 'token-1',
         pageIdentity: 'page-1', expiresAt: '2099-01-01T00:00:00Z',
-        recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY' }} />);
+        recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY' }} /></div>);
     await waitFor(() => expect(setup.overlayHttpClient.recoverBridge).toHaveBeenCalledTimes(1));
     await act(async () => setup.handlers().onConnected());
     expect(await screen.findByTestId('dom-target-overlay')).toBeInTheDocument();
@@ -162,11 +179,11 @@ describe('AgentChat protected lifecycle integration', () => {
 
   it('session cancellation clears protected resources and disconnects the transport', async () => {
     const setup = dependencies(vi.fn());
-    render(<AgentChatShell httpClient={setup.httpClient} overlayHttpClient={setup.overlayHttpClient}
-      stompClient={setup.stompClient}
+    render(<div><PublicTargetButton /><AgentChatShell httpClient={setup.httpClient}
+      overlayHttpClient={setup.overlayHttpClient} stompClient={setup.stompClient}
       bridgeBinding={{ sessionId: 'session-1', browserBindingId: 'binding-1', bridgeToken: 'token-1',
         pageIdentity: 'page-1', expiresAt: '2099-01-01T00:00:00Z',
-        recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY' }} />);
+        recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY' }} /></div>);
     await waitFor(() => expect(setup.overlayHttpClient.recoverBridge).toHaveBeenCalledTimes(1));
     await act(async () => setup.handlers().onConnected());
     expect(await screen.findByTestId('dom-target-overlay')).toBeInTheDocument();

@@ -13,7 +13,11 @@ import {
   type AgentPageProtection
 } from '../model/conversation-safety';
 import { createInitialConversationState, SAFE_CONNECTION_ERROR, SAFE_RESPONSE_ERROR, type ConversationAction, type ConversationMessage } from '../model/conversation-types';
-import type { DemoAgentBridgeBinding, PublicOverlayTarget } from '../model/overlay-types';
+import type {
+  DemoAgentBridgeBinding,
+  ObservedDomTargetClick,
+  PublicOverlayTarget
+} from '../model/overlay-types';
 import type { BrowserNavigationMode, PendingBrowserNavigation } from '../model/navigation-types';
 import {
   navigateDemoBankSpa,
@@ -364,10 +368,13 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
     apply({ type: 'OVERLAY_CLEARED_LOCAL' });
   }, [apply]);
 
-  const observeTarget = useCallback((target: PublicOverlayTarget) => {
+  const observeTarget = useCallback((observationDetails: ObservedDomTargetClick) => {
+    const { target, localRectangle, clickPosition } = observationDetails;
     const current = stateRef.current;
     const bridge = bridgeRef.current;
     if (!getConversationProtectionPolicy(current, pageProtection).canObserveTarget ||
+        target.contractVersion !== 2 ||
+        target.materializationMode !== 'USER_DOM_PUBLIC_TARGET' || !target.locator ||
         !bridge || current.observationPhase !== 'IDLE' || !current.activeTarget ||
         current.activeTarget.targetId !== target.targetId ||
         current.activeTarget.pageIdentity !== target.pageIdentity ||
@@ -379,7 +386,8 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
       requestId,
       targetId: target.targetId,
       pageIdentity: target.pageIdentity,
-      sourceSnapshotId: target.sourceSnapshotId
+      sourceSnapshotId: target.sourceSnapshotId,
+      publicTargetKey: target.locator.publicTargetKey
     };
     apply({ type: 'OBSERVATION_STARTED', observation });
     const controller = new AbortController();
@@ -389,6 +397,11 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
       requestId,
       targetId: target.targetId,
       sourceSnapshotId: target.sourceSnapshotId,
+      publicTargetKey: target.locator.publicTargetKey,
+      role: target.role,
+      actionMode: target.actionMode,
+      localRectangle,
+      clickPosition,
       observationType: 'USER_CLICK',
       clientOccurredAt: new Date().toISOString()
     }, controller.signal).then((ack) => {
@@ -446,13 +459,6 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
     protection.shouldStopTransport,
     stopTransport
   ]);
-
-  useEffect(() => {
-    if (state.pendingObservation === null) {
-      observationAbort.current?.abort();
-      observationAbort.current = null;
-    }
-  }, [state.pendingObservation]);
 
   useEffect(() => () => {
     requestAbort.current?.abort();

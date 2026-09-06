@@ -1,12 +1,12 @@
 import type { CSSProperties } from 'react';
 
 import type {
+  MaterializedDomOverlayTarget,
   OverlayObservationPhase,
-  PublicOverlayTarget
 } from '../model/overlay-types';
 
 interface DomTargetOverlayProps {
-  target: PublicOverlayTarget;
+  materializedTarget: MaterializedDomOverlayTarget;
   observationPhase: OverlayObservationPhase;
 }
 
@@ -14,18 +14,23 @@ const GUIDE_WIDTH = 320;
 const GUIDE_HEIGHT = 92;
 const GUIDE_GAP = 12;
 
-function guidePosition(target: PublicOverlayTarget): CSSProperties {
-  const below = target.rectangle.y + target.rectangle.height + GUIDE_GAP;
-  const top = below + GUIDE_HEIGHT <= target.viewport.height
+function guidePosition(materializedTarget: MaterializedDomOverlayTarget): CSSProperties {
+  const { localRectangle, viewport } = materializedTarget;
+  const below = localRectangle.y + localRectangle.height + GUIDE_GAP;
+  const top = below + GUIDE_HEIGHT <= viewport.height
     ? below
-    : Math.max(GUIDE_GAP, target.rectangle.y - GUIDE_HEIGHT - GUIDE_GAP);
+    : Math.max(GUIDE_GAP, localRectangle.y - GUIDE_HEIGHT - GUIDE_GAP);
   return {
-    left: Math.max(GUIDE_GAP, Math.min(target.rectangle.x, target.viewport.width - GUIDE_WIDTH - GUIDE_GAP)),
+    left: Math.max(GUIDE_GAP, Math.min(
+      localRectangle.x,
+      viewport.width - GUIDE_WIDTH - GUIDE_GAP
+    )),
     top
   };
 }
 
-export default function DomTargetOverlay({ target, observationPhase }: DomTargetOverlayProps) {
+export default function DomTargetOverlay({ materializedTarget, observationPhase }: DomTargetOverlayProps) {
+  const { target, localRectangle } = materializedTarget;
   return (
     <div
       className="dom-target-overlay"
@@ -38,13 +43,13 @@ export default function DomTargetOverlay({ target, observationPhase }: DomTarget
         className="dom-target-highlight"
         aria-hidden="true"
         style={{
-          left: target.rectangle.x,
-          top: target.rectangle.y,
-          width: target.rectangle.width,
-          height: target.rectangle.height
+          left: localRectangle.x,
+          top: localRectangle.y,
+          width: localRectangle.width,
+          height: localRectangle.height
         }}
       />
-      <div className="dom-target-guide" style={guidePosition(target)}>
+      <div className="dom-target-guide" style={guidePosition(materializedTarget)}>
         <strong>{target.label}</strong>
         <span>{target.guide}</span>
         <span className="dom-target-role">대상 종류: {target.role}</span>
