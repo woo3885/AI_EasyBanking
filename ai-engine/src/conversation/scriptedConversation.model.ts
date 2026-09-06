@@ -65,12 +65,20 @@ function toDecision(
   if (result.kind === "CANCEL") {
     return { ...base, mode: "STOP", message: result.message, reasonCode: "USER_CANCELLED", goalPatch: result.patch };
   }
-  if (result.kind === "AMBIGUOUS" || result.kind === "CONFLICT") {
+  if (result.kind === "CONFLICT") {
+    return {
+      ...base,
+      mode: "STOP",
+      message: result.message,
+      reasonCode: "GOAL_VALUE_CONFLICT",
+    };
+  }
+  if (result.kind === "AMBIGUOUS") {
     return {
       ...base,
       mode: "ASK_USER",
       message: result.message,
-      reasonCode: result.kind === "CONFLICT" ? "GOAL_VALUE_CONFLICT" : "AMBIGUOUS_ANSWER",
+      reasonCode: "AMBIGUOUS_ANSWER",
       question: { fieldKey: result.fieldKey },
     };
   }
