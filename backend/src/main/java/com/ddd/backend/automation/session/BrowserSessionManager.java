@@ -1,5 +1,7 @@
 package com.ddd.backend.automation.session;
 
+import com.ddd.backend.automation.dom.ElementResolutionException;
+
 import com.ddd.backend.automation.worker.BrowserTask;
 import com.ddd.backend.automation.worker.BrowserTaskResult;
 import com.ddd.backend.automation.worker.BrowserTaskStatus;
@@ -655,9 +657,10 @@ public class BrowserSessionManager implements AutoCloseable {
             );
         }
 
-        throw new IllegalStateException(
-                safeMessage
-        );
+        if (result.failureCause() instanceof ElementResolutionException resolution) {
+            throw resolution;
+        }
+        throw new IllegalStateException(safeMessage, result.failureCause());
     }
 
     private void ensureManagerOpen() {
