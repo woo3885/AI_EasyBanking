@@ -7,6 +7,7 @@ import com.ddd.backend.domain.session.AutomationSessionRepository;
 import com.ddd.backend.domain.session.WorkflowStatus;
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.ddd.backend.conversation.event.ConversationEventPublisher;
 
@@ -19,12 +20,18 @@ public final class ConversationAgentCoordinator {
     private final ConversationAgentClient client;
     private final ConversationAgentContractValidator validator;
     private final ConversationEventPublisher events;
+    private ConversationAgentDomDecisionService domDecisionService;
 
     public ConversationAgentCoordinator(ConversationService conversations, SessionMessageMailbox mailbox,
             AutomationSessionRepository sessions, ConversationAgentClient client,
             ConversationAgentContractValidator validator, ConversationEventPublisher events) {
         this.conversations = conversations; this.mailbox = mailbox; this.sessions = sessions;
         this.client = client; this.validator = validator; this.events = events;
+    }
+
+    @Autowired(required = false)
+    void setDomDecisionService(ConversationAgentDomDecisionService domDecisionService) {
+        this.domDecisionService = domDecisionService;
     }
 
     public ConversationAgentDecision process(String sessionId, MessageAcceptance acceptance,
@@ -67,11 +74,44 @@ public final class ConversationAgentCoordinator {
                         "요청 정보를 반영했습니다.", applied.revision(), now);
                 events.message(sessionId, assistantMessageId, message.sequence(), message.content(),
                         applied.revision(), WorkflowStatus.AI_EXECUTING, null, now);
+                if (domDecisionService != null && domDecisionService.canContinue(sessionId)) {
+                    decision = domDecisionService.decideOnce(
+                            sessionId, acceptance, state, content, answerToQuestionId);
+                    applyDomDecision(sessionId, state, session, decision);
+                }
             } else {
                 throw new IllegalArgumentException("Unsupported conversation decision mode");
             }
             mailbox.completeActive(sessionId, acceptance.messageId());
         }
         return decision;
+    }
+
+    private void applyDomDecision(String sessionId, ConversationState state,
+            AutomationSession session, ConversationAgentDecision decision) {
+        if (decision.mode() == ConversationInteractionMode.ASK_USER
+                || decision.mode() == ConversationInteractionMode.GOAL_PATCH_PROPOSED) {
+            throw new IllegalArgumentException("Latest DOM decision cannot start another goal update in the same turn");
+        }
+        WorkflowStatus status = switch (decision.mode()) {
+            case GUIDE_USER -> WorkflowStatus.USER_DECISION_REQUIRED;
+            case SECURE_INPUT_REQUIRED -> WorkflowStatus.SECURE_INPUT_REQUIRED;
+            case RISK_WARNING -> WorkflowStatus.RISK_WARNING;
+            case FINAL_CONFIRMATION_REQUIRED -> WorkflowStatus.FINAL_CONFIRMATION_REQUIRED;
+            case COMPLETE -> WorkflowStatus.COMPLETED;
+            case STOP -> WorkflowStatus.TERMINATED;
+            case AUTO_EXECUTE -> WorkflowStatus.AI_EXECUTING;
+            default -> throw new IllegalArgumentException("Unsupported latest DOM decision mode");
+        };
+        session.transitionTo(status);
+        sessions.save(session);
+        if (decision.message() != null && !decision.message().isBlank()) {
+            Instant now = Instant.now();
+            String assistantMessageId = UUID.randomUUID().toString();
+            ConversationMessage message = state.appendAiMessage(assistantMessageId,
+                    decision.message(), state.goal().revision(), now);
+            events.message(sessionId, assistantMessageId, message.sequence(), message.content(),
+                    state.goal().revision(), status, decision.reasonCode(), now);
+        }
     }
 }

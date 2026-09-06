@@ -181,6 +181,33 @@ class InteractiveElementExtractorTest {
                 );
     }
 
+    @Test
+    void agent_widget과_overlay_하위_DOM은_snapshot_후보에서_제외한다() {
+        manager.execute(SESSION_ID, Duration.ofSeconds(5), page -> {
+            page.setContent("""
+                    <main>
+                      <button id="site-action">예금 상품 선택</button>
+                    </main>
+                    <aside data-ddd-agent-ui="chat">
+                      <button id="agent-send">요청 전송</button>
+                      <input id="agent-message" aria-label="AI 요청" />
+                      <div data-ddd-agent-ui="overlay">
+                        <button id="overlay-proxy">여기를 누르세요</button>
+                      </div>
+                    </aside>
+                    """);
+            return null;
+        });
+
+        List<InteractiveElement> elements = extractor.extract(SESSION_ID);
+
+        assertThat(elements).hasSize(1);
+        assertThat(elements.getFirst().domId()).isEqualTo("site-action");
+        assertThat(elements)
+                .extracting(InteractiveElement::text)
+                .doesNotContain("요청 전송", "여기를 누르세요");
+    }
+
     /*
      * 하나의 element가
      * button이면서 role=button이더라도

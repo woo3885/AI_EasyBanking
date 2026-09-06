@@ -101,7 +101,8 @@ public class AutomationSessionController {
             sessionContent = conversationService.validateContent(sessionContent);
         }
         AutomationSession session = request.usesConversationContract()
-                ? sessionService.createConversationSession(sessionContent)
+                ? sessionService.createConversationSession(
+                        sessionContent, request.siteId(), request.initialPath())
                 : sessionService.createSession(sessionContent, request.siteId(), request.initialPath());
 
         AutomationSessionResponse response =

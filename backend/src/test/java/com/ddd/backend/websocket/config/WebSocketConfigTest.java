@@ -38,7 +38,8 @@ class WebSocketConfigTest {
         );
 
         verify(registration).setAllowedOrigins(
-                "http://127.0.0.1:5173"
+                "http://127.0.0.1:5173",
+                "http://127.0.0.1:5190"
         );
     }
 

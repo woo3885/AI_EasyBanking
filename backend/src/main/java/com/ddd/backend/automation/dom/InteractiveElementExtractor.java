@@ -81,7 +81,8 @@ public final class InteractiveElementExtractor {
 
         Locator candidates =
                 page.locator(
-                        INTERACTIVE_SELECTOR
+                        ":is(" + INTERACTIVE_SELECTOR + ")"
+                                + ":not([data-ddd-agent-ui], [data-ddd-agent-ui] *)"
                 );
 
         int count =

@@ -224,7 +224,8 @@ class AutomationSessionControllerTest {
         AutomationSession session = AutomationSession.create("100만원 예금");
         when(conversationService.validateContent("100만원 예금"))
                 .thenReturn("100만원 예금");
-        when(sessionService.createConversationSession("100만원 예금"))
+        when(sessionService.createConversationSession(
+                "100만원 예금", "demo-bank", "/deposits"))
                 .thenReturn(session);
         when(conversationService.acceptInitial(
                 org.mockito.ArgumentMatchers.eq(session.getSessionId()),
@@ -256,6 +257,8 @@ class AutomationSessionControllerTest {
                         "메시지가 접수되었습니다. AI 판단이나 실행 성공을 의미하지 않습니다."));
 
         verify(sessionService, never()).startInitialAi(session.getSessionId());
+        verify(sessionService).createConversationSession(
+                "100만원 예금", "demo-bank", "/deposits");
     }
 
     @Test

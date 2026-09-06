@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.ddd.backend.security.secureinput.SecureInputRegistry;
 import com.ddd.backend.conversation.ConversationService;
+import com.ddd.backend.conversation.bridge.DemoAgentBridgeService;
 
 @Service
 public class AutomationSessionService {
@@ -67,6 +68,7 @@ public class AutomationSessionService {
     private final AgentLoopService agentLoopService;
     private SecureInputRegistry secureInputRegistry;
     private ConversationService conversationService;
+    private DemoAgentBridgeService demoAgentBridgeService;
 
     @Autowired
     void setSecureInputRegistry(SecureInputRegistry secureInputRegistry) {
@@ -76,6 +78,11 @@ public class AutomationSessionService {
     @Autowired(required = false)
     void setConversationService(ConversationService conversationService) {
         this.conversationService = conversationService;
+    }
+
+    @Autowired(required = false)
+    void setDemoAgentBridgeService(DemoAgentBridgeService demoAgentBridgeService) {
+        this.demoAgentBridgeService = demoAgentBridgeService;
     }
 
     /*
@@ -246,6 +253,29 @@ public class AutomationSessionService {
      * Browser/DOM work starts after a later explicit LATEST_DOM_DECISION boundary. */
     public AutomationSession createConversationSession(String userRequest) {
         return sessionRepository.save(AutomationSession.create(userRequest));
+    }
+
+    public AutomationSession createConversationSession(
+            String userRequest,
+            String siteId,
+            String initialPath
+    ) {
+        DemoNavigationTarget target = demoNavigationPolicy.resolve(siteId, initialPath);
+        AutomationSession session = AutomationSession.create(userRequest);
+        String sessionId = session.getSessionId();
+        browserSessionManager.createSession(sessionId);
+        try {
+            String finalUrl = browserSessionManager.navigate(sessionId, target.targetUri());
+            demoNavigationPolicy.validateNavigatedTarget(target, finalUrl);
+            session.updateCurrentUrl(finalUrl);
+            if (demoAgentBridgeService != null) {
+                demoAgentBridgeService.bootstrap(sessionId);
+            }
+            return sessionRepository.save(session);
+        } catch (RuntimeException exception) {
+            cleanupBrowserResources(sessionId);
+            throw exception;
+        }
     }
 
     /*
@@ -480,6 +510,7 @@ public class AutomationSessionService {
         cleanupAgentLoopSafely(sessionId);
         cleanupSecureInputStateSafely(sessionId);
         cleanupConversationStateSafely(sessionId);
+        cleanupDemoAgentBridgeSafely(sessionId);
 
         /*
          * Playwright BrowserContext / Page 종료.
@@ -563,6 +594,7 @@ public class AutomationSessionService {
         cleanupAgentLoopSafely(sessionId);
         cleanupSecureInputStateSafely(sessionId);
         cleanupConversationStateSafely(sessionId);
+        cleanupDemoAgentBridgeSafely(sessionId);
 
         /*
          * BrowserContext / Page 종료.
@@ -660,6 +692,14 @@ public class AutomationSessionService {
             if (conversationService != null) conversationService.removeSession(sessionId);
         } catch (RuntimeException ignored) {
             // Conversation cleanup failure must not block browser/session cleanup.
+        }
+    }
+
+    private void cleanupDemoAgentBridgeSafely(String sessionId) {
+        try {
+            if (demoAgentBridgeService != null) demoAgentBridgeService.removeSession(sessionId);
+        } catch (RuntimeException ignored) {
+            // Bridge cleanup failure must not block session cleanup.
         }
     }
 

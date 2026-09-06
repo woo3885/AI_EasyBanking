@@ -17,6 +17,16 @@ public class GlobalExceptionHandler {
                     GlobalExceptionHandler.class
             );
 
+    @ExceptionHandler(com.ddd.backend.conversation.bridge.DemoAgentBridgeAuthenticationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDemoAgentBridgeAuthentication(
+            com.ddd.backend.conversation.bridge.DemoAgentBridgeAuthenticationException exception
+    ) {
+        log.warn("Demo Agent bridge authentication rejected.");
+        return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
+                .body(new ApiResponse<>(false, null, "BRIDGE_401_INVALID_IDENTITY",
+                        "Demo Agent bridge 인증에 실패했습니다."));
+    }
+
     @ExceptionHandler(com.ddd.backend.conversation.ConversationException.class)
     public ResponseEntity<ApiResponse<Void>> handleConversation(
             com.ddd.backend.conversation.ConversationException exception

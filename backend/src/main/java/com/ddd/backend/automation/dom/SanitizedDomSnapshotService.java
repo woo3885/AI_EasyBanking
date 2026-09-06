@@ -27,9 +27,7 @@ public final class SanitizedDomSnapshotService {
             300;
 
     private static final Duration SNAPSHOT_TIMEOUT =
-            Duration.ofSeconds(
-                    10
-            );
+            Duration.ofSeconds(20);
 
     private final BrowserSessionManager browserSessionManager;
 

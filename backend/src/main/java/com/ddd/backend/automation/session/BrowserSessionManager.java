@@ -89,6 +89,7 @@ public class BrowserSessionManager implements AutoCloseable {
 
     private final PlaywrightWorker playwrightWorker;
     private final boolean headedSecureTakeoverEnabled;
+    private final boolean headedDemoAgentBridgeEnabled;
 
     private final AtomicBoolean closed =
             new AtomicBoolean(false);
@@ -107,14 +108,24 @@ public class BrowserSessionManager implements AutoCloseable {
     public BrowserSessionManager(
             PlaywrightWorker playwrightWorker
     ) {
-        this(playwrightWorker, false);
+        this(playwrightWorker, false, false);
+    }
+
+    public BrowserSessionManager(
+            PlaywrightWorker playwrightWorker,
+            @Value("${ddd.secure-takeover.demo-headed-enabled:false}")
+            boolean headedSecureTakeoverEnabled
+    ) {
+        this(playwrightWorker, headedSecureTakeoverEnabled, false);
     }
 
     @Autowired
     public BrowserSessionManager(
             PlaywrightWorker playwrightWorker,
             @Value("${ddd.secure-takeover.demo-headed-enabled:false}")
-            boolean headedSecureTakeoverEnabled
+            boolean headedSecureTakeoverEnabled,
+            @Value("${ddd.demo-agent-bridge.headed-enabled:false}")
+            boolean headedDemoAgentBridgeEnabled
     ) {
         this.playwrightWorker =
                 Objects.requireNonNull(
@@ -122,6 +133,7 @@ public class BrowserSessionManager implements AutoCloseable {
                         "PlaywrightWorker는 필수입니다."
                 );
         this.headedSecureTakeoverEnabled = headedSecureTakeoverEnabled;
+        this.headedDemoAgentBridgeEnabled = headedDemoAgentBridgeEnabled;
     }
 
     /*
@@ -491,7 +503,8 @@ public class BrowserSessionManager implements AutoCloseable {
                             .launch(
                                     new BrowserType.LaunchOptions()
                                             .setHeadless(
-                                                    !headedSecureTakeoverEnabled
+                                                    !(headedSecureTakeoverEnabled
+                                                            || headedDemoAgentBridgeEnabled)
                                             )
                             );
 
