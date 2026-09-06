@@ -6,6 +6,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import com.ddd.backend.conversation.overlay.*;
 import com.ddd.backend.conversation.navigation.PendingBrowserNavigation;
+import com.ddd.backend.conversation.navigation.PageReadyResumeError;
 @Component
 public final class ConversationEventStore {
     private final ConcurrentHashMap<String, List<ConversationEvent>> events = new ConcurrentHashMap<>();
@@ -76,6 +77,14 @@ public final class ConversationEventStore {
                 lastSequence(value.sessionId()) + 1, "NAVIGATION_CLEAR", value.sessionId(),
                 value.navigationId(), value.browserBindingId(), value.sourcePageIdentity(),
                 value.destinationPageIdentity(), value.routeRevision(), "REPLACED_OR_CANCELLED", at);
+        events.computeIfAbsent(value.sessionId(), ignored -> new ArrayList<>()).add(event);
+        return event;
+    }
+    public synchronized PageReadyResumeFailedEvent pageReadyResumeFailed(
+            PendingBrowserNavigation value, PageReadyResumeError error, Instant at) {
+        var event = new PageReadyResumeFailedEvent(UUID.randomUUID().toString(),
+                lastSequence(value.sessionId()) + 1, "PAGE_READY_RESUME_FAILED", value.sessionId(),
+                value.navigationId(), error, error.safeMessage(), at);
         events.computeIfAbsent(value.sessionId(), ignored -> new ArrayList<>()).add(event);
         return event;
     }

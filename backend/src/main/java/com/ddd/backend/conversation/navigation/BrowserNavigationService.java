@@ -17,6 +17,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import jakarta.annotation.PreDestroy;
+import com.ddd.backend.automation.dom.ElementResolutionException;
+import com.ddd.backend.conversation.overlay.OverlayTargetException;
+import com.ddd.backend.conversation.overlay.OverlayTargetError;
 
 import static com.ddd.backend.conversation.navigation.BrowserNavigationError.*;
 
@@ -33,6 +39,7 @@ public final class BrowserNavigationService {
     private final BrowserNavigationRoutePolicy routes;
     private final ConversationEventPublisher events;
     private final ObjectProvider<BrowserPageReadyResumePort> resumePort;
+    private final ExecutorService resumeExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     public BrowserNavigationService(AutomationSessionRepository sessions,
             UserBrowserBridgeRegistry bindings, PendingBrowserNavigationRegistry navigations,
@@ -63,6 +70,10 @@ public final class BrowserNavigationService {
     public BrowserPageReadyResponse pageReady(String sessionId, String token, String origin,
             String browserBindingId, String headerPageIdentity, BrowserPageReadyRequest request) {
         requireSession(sessionId);
+        BrowserPageReadyResumePort port = resumePort.getIfAvailable();
+        if (port == null) {
+            throw new IllegalStateException("Browser page-ready resume port가 준비되지 않았습니다.");
+        }
         bindings.authenticateForNavigation(
                 sessionId, token, origin, browserBindingId);
         if (!request.sourcePageIdentity().equals(headerPageIdentity)) {
@@ -77,13 +88,7 @@ public final class BrowserNavigationService {
                 sessionId, browserBindingId, claimed.sourcePageIdentity(),
                 claimed.destinationPageIdentity(), renderedRoute);
         PendingBrowserNavigation consumed = navigations.consume(sessionId, claimed.navigationId());
-        Instant now = Instant.now();
-        events.pageReadyObserved(consumed, now);
-        BrowserPageReadyResumePort port = resumePort.getIfAvailable();
-        if (port == null) {
-            throw new IllegalStateException("Browser page-ready resume port가 준비되지 않았습니다.");
-        }
-        port.resumeOnce(consumed);
+        resumeExecutor.submit(() -> observeAndResume(port, consumed));
         return new BrowserPageReadyResponse(
                 sessionId, request.requestId(), consumed.navigationId(), rotated.browserBindingId(),
                 consumed.sourcePageIdentity(), rotated.pageIdentity(), consumed.routeRevision(),
@@ -97,6 +102,42 @@ public final class BrowserNavigationService {
     private AutomationSession requireSession(String sessionId) {
         return sessions.findById(sessionId)
                 .orElseThrow(() -> new BrowserNavigationException(NAVIGATION_NOT_FOUND));
+    }
+    private void observeAndResume(BrowserPageReadyResumePort port, PendingBrowserNavigation navigation) {
+        try {
+            events.pageReadyObserved(navigation, Instant.now());
+            port.resumeOnce(navigation);
+        } catch (RuntimeException exception) {
+            events.pageReadyResumeFailed(navigation, classifyResumeError(exception), Instant.now());
+        }
+    }
+    private PageReadyResumeError classifyResumeError(Throwable error) {
+        for (Throwable current = error; current != null; current = current.getCause()) {
+            if (current instanceof PageReadyResumeException resume) return resume.error();
+            if (current instanceof ElementResolutionException resolution) {
+                return switch (resolution.error()) {
+                    case TARGET_NOT_FOUND -> PageReadyResumeError.OVERLAY_TARGET_NOT_FOUND;
+                    case TARGET_AMBIGUOUS -> PageReadyResumeError.OVERLAY_TARGET_AMBIGUOUS;
+                    case STALE_SNAPSHOT -> PageReadyResumeError.OVERLAY_TARGET_STALE_SNAPSHOT;
+                    case POLICY_MISMATCH -> PageReadyResumeError.OVERLAY_TARGET_POLICY_MISMATCH;
+                };
+            }
+            if (current instanceof OverlayTargetException target) {
+                if (target.error() == OverlayTargetError.TARGET_NOT_FOUND) {
+                    return PageReadyResumeError.OVERLAY_TARGET_NOT_FOUND;
+                }
+                if (target.error() == OverlayTargetError.TARGET_STALE_SNAPSHOT
+                        || target.error() == OverlayTargetError.TARGET_STALE_PAGE) {
+                    return PageReadyResumeError.OVERLAY_TARGET_STALE_SNAPSHOT;
+                }
+                return PageReadyResumeError.OVERLAY_TARGET_POLICY_MISMATCH;
+            }
+        }
+        return PageReadyResumeError.PAGE_READY_RESUME_FAILED;
+    }
+    @PreDestroy
+    void closeResumeExecutor() {
+        resumeExecutor.close();
     }
     private String safeGuide(String guide) {
         if (guide == null || guide.isBlank() || guide.length() > 200

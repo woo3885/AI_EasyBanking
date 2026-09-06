@@ -40,7 +40,11 @@ public class RestCorsConfig
                 )
                 .allowedHeaders(
                         "Content-Type",
-                        "Accept"
+                        "Accept",
+                        "X-DDD-Bridge-Token",
+                        "X-DDD-Browser-Binding-Id",
+                        "X-DDD-Page-Identity",
+                        "X-Request-Id"
                 )
                 /*
                  * 현재 D17은 cookie 기반 인증을

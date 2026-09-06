@@ -74,6 +74,12 @@ public final class NavigationPageReadyResumeAdapter implements BrowserPageReadyR
             decisions.completeResume(navigation.navigationId());
         } catch (RuntimeException exception) {
             decisions.failResume(navigation.navigationId());
+            sessions.findById(navigation.sessionId()).ifPresent(session -> {
+                if (!BLOCKED.contains(session.getStatus())) {
+                    session.transitionTo(WorkflowStatus.ERROR);
+                    sessions.save(session);
+                }
+            });
             throw exception;
         }
     }
