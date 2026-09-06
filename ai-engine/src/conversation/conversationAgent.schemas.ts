@@ -1,5 +1,6 @@
 import {
   AGENT_MODES,
+  CONVERSATION_ACTION_TYPES,
   GOAL_INTENTS,
   GOAL_STATUSES,
 } from "./conversationAgent.types.js";
@@ -144,8 +145,14 @@ export const agentDecisionSchema = {
         {
           type: "object",
           additionalProperties: false,
-          required: ["actionType"],
-          properties: { actionType: nonEmptyString },
+          required: ["actionType", "targetElementId", "role", "accessibleLabel", "guide"],
+          properties: {
+            actionType: { enum: CONVERSATION_ACTION_TYPES },
+            targetElementId: { type: "string", minLength: 1, maxLength: 128 },
+            role: { type: "string", minLength: 1, maxLength: 32 },
+            accessibleLabel: { type: "string", minLength: 1, maxLength: 120, pattern: "^[^\\r\\n]+$" },
+            guide: { type: "string", minLength: 1, maxLength: 200, pattern: "^[^\\r\\n]+$" },
+          },
         },
       ],
     },

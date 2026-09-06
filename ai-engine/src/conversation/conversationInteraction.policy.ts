@@ -13,7 +13,9 @@ import {
 } from "../deposit/depositScenario.policy.js";
 import { detectFinalAction } from "../finalAction/finalAction.detector.js";
 import {
+  SAFE_DECISION_LABEL,
   SAFE_INTERNAL_MESSAGE,
+  sanitizeDecisionLabel,
   sanitizeInternalMessage,
 } from "../messages/messageSafety.js";
 import type { StructuredAIResponse } from "../output/aiResponse.types.js";
@@ -23,6 +25,8 @@ import { createRiskWarningResult } from "../risk/riskWarning.mapper.js";
 import { createSecureInputPauseForRequest } from "../secureInput/secureInput.policy.js";
 import type {
   AgentDecision,
+  ConversationActionCandidate,
+  ConversationActionType,
   ConversationAgentRequest,
 } from "./conversationAgent.types.js";
 import { validateAgentDecision } from "./conversationAgent.validator.js";
@@ -50,6 +54,10 @@ const TERMINAL_REASON_CODES = new Set([
 const NORMALIZED_WHITESPACE = /\s+/gu;
 const TERM_WORDS = ["약관", "동의", "필수", "선택"] as const;
 const PRODUCT_WORDS = ["예금", "상품", "정기예금"] as const;
+const TARGET_INSTRUCTION = /(?:이전|시스템).{0,12}지시.{0,12}무시|(?:자동|즉시).{0,12}(?:클릭|눌러|선택|입력)/iu;
+const TARGET_TECHNICAL_TEXT = /(?:#[A-Za-z_][\w-]*|\/\/[A-Za-z*]|\bel-[a-z0-9_-]+\b|innerHTML|outerHTML|selector|xpath|\[[^\]]+\]\([^)]+\))/iu;
+const GUIDE_ROLES = new Set(["button", "link", "radio", "checkbox", "option"]);
+const CLICK_ROLES = new Set(["button", "link"]);
 
 export interface InteractionValidationResult {
   valid: boolean;
@@ -87,16 +95,87 @@ function withSnapshotMode(
   mode: AgentDecision["mode"],
   message: string,
   reasonCode: string,
-  actionType: string | null = null,
+  action: {
+    actionType: ConversationActionType;
+    target: BackendSanitizedDomElement;
+  } | null = null,
 ): AgentDecision {
   const base = baseDecision(input);
+  const safeMessage = sanitizeInternalMessage(message);
+  const actionCandidate = action === null
+    ? null
+    : createActionCandidate(input, action.actionType, action.target, safeMessage);
+  if (action !== null && actionCandidate === null) {
+    return { ...base, reasonCode: "BLOCKED_TARGET" };
+  }
   return {
     ...base,
     mode,
-    message: sanitizeInternalMessage(message),
+    message: safeMessage,
     reasonCode,
     sourceSnapshotId: input.snapshot?.sourceSnapshotId ?? null,
-    actionCandidate: actionType === null ? null : { actionType },
+    actionCandidate,
+  };
+}
+
+function safeTargetLabel(element: BackendSanitizedDomElement): string | null {
+  for (const value of [element.ariaLabel, element.text, element.placeholder]) {
+    if (
+      !value?.trim() ||
+      TARGET_INSTRUCTION.test(value) ||
+      TARGET_TECHNICAL_TEXT.test(value)
+    ) continue;
+    const sanitized = sanitizeInternalMessage(value);
+    if (
+      sanitized === SAFE_INTERNAL_MESSAGE ||
+      sanitized.includes("[보호됨]")
+    ) continue;
+    const label = sanitizeDecisionLabel(value);
+    if (label !== SAFE_DECISION_LABEL) return label;
+  }
+  return null;
+}
+
+function uniqueSnapshotElement(
+  input: ConversationAgentRequest,
+  elementId: string | null | undefined,
+): BackendSanitizedDomElement | null {
+  if (!elementId || !input.snapshot) return null;
+  const matches = input.snapshot.sanitizedDomSnapshot.elements.filter(
+    (element) => element.elementId === elementId,
+  );
+  return matches.length === 1 ? matches[0] ?? null : null;
+}
+
+function createActionCandidate(
+  input: ConversationAgentRequest,
+  actionType: ConversationActionType,
+  target: BackendSanitizedDomElement,
+  guide: string,
+): ConversationActionCandidate | null {
+  const current = uniqueSnapshotElement(input, target.elementId);
+  if (
+    !current ||
+    !current.visible ||
+    !current.enabled ||
+    !current.role?.trim() ||
+    TARGET_TECHNICAL_TEXT.test(guide)
+  ) return null;
+  const role = current.role.toLowerCase();
+  const roleAllowed = actionType === "WAIT_FOR_USER"
+    ? GUIDE_ROLES.has(role)
+    : actionType === "CLICK"
+      ? CLICK_ROLES.has(role)
+      : role === "textbox";
+  if (!roleAllowed) return null;
+  const label = safeTargetLabel(current);
+  if (!label || sanitizeInternalMessage(guide) !== guide) return null;
+  return {
+    actionType,
+    targetElementId: current.elementId,
+    role,
+    accessibleLabel: label,
+    guide,
   };
 }
 
@@ -181,11 +260,15 @@ function guideMessage(elements: readonly BackendSanitizedDomElement[]): string {
 
 function safeNormalAction(
   input: ConversationAgentRequest,
-): "CLICK" | "TYPE" | null {
+): { actionType: "CLICK" | "TYPE"; target: BackendSanitizedDomElement } | null {
   const elements = input.snapshot?.sanitizedDomSnapshot.elements ?? [];
-  const safe = elements.flatMap((element) => {
+  const safe: Array<{
+    actionType: "CLICK" | "TYPE";
+    target: BackendSanitizedDomElement;
+  }> = [];
+  for (const element of elements) {
     if (!element.visible || !element.enabled || element.securityPolicy !== "NORMAL") {
-      return [];
+      continue;
     }
     const label = textOf(element);
     const tag = element.tag.toLowerCase();
@@ -193,17 +276,18 @@ function safeNormalAction(
     if (tag === "input" || tag === "textarea" || role === "textbox") {
       const amount = input.goal.amount?.value;
       const amountField = /(?:가입|예치)?\s*금액/u.test(label);
-      return amount && amountField && element.inputType !== "password"
-        ? ["TYPE" as const]
-        : [];
+      if (amount && amountField && element.inputType !== "password") {
+        safe.push({ actionType: "TYPE", target: element });
+      }
+      continue;
     }
     if (!["button", "a"].includes(tag) && !["button", "link"].includes(role ?? "")) {
-      return [];
+      continue;
     }
-    return evaluateActionPolicy("CLICK", label).canExecute
-      ? ["CLICK" as const]
-      : [];
-  });
+    if (evaluateActionPolicy("CLICK", label).canExecute) {
+      safe.push({ actionType: "CLICK", target: element });
+    }
+  }
   return safe.length === 1 ? safe[0] ?? null : null;
 }
 
@@ -218,8 +302,9 @@ function containsUnverifiedFinalAction(input: ConversationAgentRequest): boolean
 }
 
 /**
- * Deterministic C-04 policy. It only proposes a mode/action kind; Backend
- * remains authoritative for target identity, execution and every latch.
+ * Deterministic C-04 policy. C may return only the current snapshot's internal
+ * elementId; Backend revalidates it and remains authoritative for public
+ * target identity, execution and every latch.
  */
 export function decideConversationInteraction(
   input: ConversationAgentRequest,
@@ -295,26 +380,41 @@ export function decideConversationInteraction(
 
   const stage = classifyDepositScenarioStage(actionRequest);
   if (stage !== "UNKNOWN") {
-    const protectedResponse = enforceDepositScenarioPolicy(
-      neutralResponse(input.requestId),
-      actionRequest,
-    );
+    let protectedResponse: StructuredAIResponse;
+    try {
+      protectedResponse = enforceDepositScenarioPolicy(
+        neutralResponse(input.requestId),
+        actionRequest,
+      );
+    } catch {
+      return { ...base, reasonCode: "BLOCKED_TARGET" };
+    }
     if (protectedResponse.action === "WAIT_FOR_USER") {
+      const target = uniqueSnapshotElement(
+        input,
+        protectedResponse.options?.[0]?.id,
+      );
+      if (!target) return { ...base, reasonCode: "BLOCKED_TARGET" };
       return withSnapshotMode(
         input,
         "GUIDE_USER",
         protectedResponse.message,
         `D25_${stage}`,
-        "WAIT_FOR_USER",
+        { actionType: "WAIT_FOR_USER", target },
       );
     }
     if (["CLICK", "TYPE"].includes(protectedResponse.action)) {
+      const target = uniqueSnapshotElement(input, protectedResponse.targetElementId);
+      if (!target) return { ...base, reasonCode: "BLOCKED_TARGET" };
       return withSnapshotMode(
         input,
         "AUTO_EXECUTE",
         protectedResponse.message,
         `D25_${stage}`,
-        protectedResponse.action,
+        {
+          actionType: protectedResponse.action as "CLICK" | "TYPE",
+          target,
+        },
       );
     }
     if (protectedResponse.action === "PAUSE_FOR_SECURE_INPUT") {
@@ -340,12 +440,14 @@ export function decideConversationInteraction(
     (element) => element.visible && element.enabled && element.securityPolicy === "USER_DECISION",
   );
   if (userChoices.length > 0) {
+    const target = userChoices[0];
+    if (!target) return { ...base, reasonCode: "BLOCKED_TARGET" };
     return withSnapshotMode(
       input,
       "GUIDE_USER",
       guideMessage(userChoices),
       "USER_DECISION_BOUNDARY",
-      "WAIT_FOR_USER",
+      { actionType: "WAIT_FOR_USER", target },
     );
   }
 
@@ -354,7 +456,7 @@ export function decideConversationInteraction(
     return withSnapshotMode(
       input,
       "AUTO_EXECUTE",
-      action === "TYPE" ? DEPOSIT_GUIDANCE.amount : "다음 화면으로 이동합니다.",
+      action.actionType === "TYPE" ? DEPOSIT_GUIDANCE.amount : "다음 화면으로 이동합니다.",
       "SAFE_CURRENT_SNAPSHOT_ACTION",
       action,
     );
@@ -399,6 +501,50 @@ export function validateConversationInteractionDecision(
     errors.push("/message must satisfy the existing safe-message policy");
   }
 
+  if (decision.mode === "GUIDE_USER" || decision.mode === "AUTO_EXECUTE") {
+    const candidate = decision.actionCandidate;
+    const matches = input.snapshot?.sanitizedDomSnapshot.elements.filter(
+      (element) => element.elementId === candidate?.targetElementId,
+    ) ?? [];
+    if (matches.length !== 1) {
+      errors.push("/actionCandidate/targetElementId must identify exactly one current snapshot element");
+    } else if (candidate) {
+      const target = matches[0]!;
+      if (!target.visible || !target.enabled) {
+        errors.push("/actionCandidate target must be visible and enabled");
+      }
+      const requiredPolicy = decision.mode === "GUIDE_USER"
+        ? "USER_DECISION"
+        : "NORMAL";
+      if (target.securityPolicy !== requiredPolicy) {
+        errors.push(`/actionCandidate target must have ${requiredPolicy} security policy`);
+      }
+      if (!target.role || candidate.role !== target.role.toLowerCase()) {
+        errors.push("/actionCandidate/role must match the sanitized target role");
+      }
+      const expectedLabel = safeTargetLabel(target);
+      if (!expectedLabel || candidate.accessibleLabel !== expectedLabel) {
+        errors.push("/actionCandidate/accessibleLabel must match the safe sanitized target label");
+      }
+      if (
+        decision.message === null ||
+        candidate.guide !== decision.message ||
+        sanitizeInternalMessage(candidate.guide) !== candidate.guide
+      ) {
+        errors.push("/actionCandidate/guide must equal the safe decision message");
+      }
+      if (decision.mode === "GUIDE_USER" && candidate.actionType !== "WAIT_FOR_USER") {
+        errors.push("/actionCandidate/actionType must be WAIT_FOR_USER for GUIDE_USER");
+      }
+      if (
+        decision.mode === "AUTO_EXECUTE" &&
+        !["CLICK", "TYPE"].includes(candidate.actionType)
+      ) {
+        errors.push("/actionCandidate/actionType must be CLICK or TYPE for AUTO_EXECUTE");
+      }
+    }
+  }
+
   if (decision.mode === "ASK_USER") {
     const fieldKey = decision.question?.fieldKey;
     const missingInCurrentGoal = fieldKey
@@ -431,7 +577,10 @@ export function validateConversationInteractionDecision(
     if (expected.mode !== decision.mode) {
       errors.push(`/mode conflicts with current protection policy; expected ${expected.mode}`);
     }
-    if (expected.actionCandidate?.actionType !== decision.actionCandidate?.actionType) {
+    if (
+      JSON.stringify(expected.actionCandidate) !==
+      JSON.stringify(decision.actionCandidate)
+    ) {
       errors.push("/actionCandidate must match the current snapshot policy");
     }
   }

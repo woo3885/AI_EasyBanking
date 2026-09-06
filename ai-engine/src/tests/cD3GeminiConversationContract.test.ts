@@ -57,7 +57,7 @@ test("C-D3-GEMINI-03 rejects an invalid action candidate shape", async () => {
   const { request: input, decision } = await scriptedDecision("03");
   await rejectsContract(input, {
     ...decision,
-    actionCandidate: { actionType: "CLICK", selector: "#password" },
+    actionCandidate: { ...decision.actionCandidate!, selector: "#password" },
   });
 });
 
@@ -68,7 +68,13 @@ test("C-D3-GEMINI-04 rejects secure-screen AUTO_EXECUTE", async () => {
     mode: "AUTO_EXECUTE",
     message: "다음 단계를 진행합니다.",
     reasonCode: "MODEL_AUTO",
-    actionCandidate: { actionType: "TYPE" },
+    actionCandidate: {
+      actionType: "TYPE",
+      targetElementId: "el-password",
+      role: "textbox",
+      accessibleLabel: "계좌 비밀번호",
+      guide: "다음 단계를 진행합니다.",
+    },
   });
 });
 
@@ -79,7 +85,13 @@ test("C-D3-GEMINI-05 rejects final-confirmation CLICK", async () => {
     mode: "AUTO_EXECUTE",
     message: "다음 단계를 진행합니다.",
     reasonCode: "MODEL_AUTO",
-    actionCandidate: { actionType: "CLICK" },
+    actionCandidate: {
+      actionType: "CLICK",
+      targetElementId: "el-final-approve",
+      role: "button",
+      accessibleLabel: "Demo 예금 최종 승인",
+      guide: "다음 단계를 진행합니다.",
+    },
   });
 });
 
@@ -95,4 +107,94 @@ test("C-D3-GEMINI-07 rejects raw credential echo", async () => {
 
 test("C-D3-GEMINI-08 rejects invalid JSON", async () => {
   await rejectsContract(request("03"), "```json not-json ```", "INVALID_JSON");
+});
+
+test("C-GUIDE-GEMINI-09 rejects GUIDE_USER without an internal target reference", async () => {
+  const { request: input, decision } = await scriptedDecision("04");
+  await rejectsContract(input, {
+    ...decision,
+    actionCandidate: { actionType: "WAIT_FOR_USER" },
+  });
+});
+
+test("C-GUIDE-GEMINI-10 rejects GUIDE_USER with a raw selector", async () => {
+  const { request: input, decision } = await scriptedDecision("04");
+  await rejectsContract(input, {
+    ...decision,
+    actionCandidate: { ...decision.actionCandidate!, XPath: "//button" },
+  });
+});
+
+test("C-GUIDE-GEMINI-11 rejects GUIDE_USER on a secure target", async () => {
+  const { request: input, decision } = await scriptedDecision("08");
+  await rejectsContract(input, {
+    ...decision,
+    mode: "GUIDE_USER",
+    message: "필요한 항목을 직접 선택해 주세요.",
+    reasonCode: "MODEL_GUIDE",
+    actionCandidate: {
+      actionType: "WAIT_FOR_USER",
+      targetElementId: "el-password",
+      role: "textbox",
+      accessibleLabel: "계좌 비밀번호",
+      guide: "필요한 항목을 직접 선택해 주세요.",
+    },
+  });
+});
+
+test("C-GUIDE-GEMINI-12 rejects GUIDE_USER while risk policy is active", async () => {
+  const { request: input, decision } = await scriptedDecision("09");
+  const target = input.snapshot!.sanitizedDomSnapshot.elements[0]!;
+  target.role = "button";
+  target.enabled = true;
+  target.securityPolicy = "USER_DECISION";
+  await rejectsContract(input, {
+    ...decision,
+    mode: "GUIDE_USER",
+    message: "필요한 항목을 직접 선택해 주세요.",
+    reasonCode: "MODEL_GUIDE",
+    actionCandidate: {
+      actionType: "WAIT_FOR_USER",
+      targetElementId: target.elementId,
+      role: "button",
+      accessibleLabel: "보이스피싱 의심 거래 안내",
+      guide: "필요한 항목을 직접 선택해 주세요.",
+    },
+  });
+});
+
+test("C-GUIDE-GEMINI-13 rejects GUIDE_USER on a final target", async () => {
+  const { request: input, decision } = await scriptedDecision("10");
+  await rejectsContract(input, {
+    ...decision,
+    mode: "GUIDE_USER",
+    message: "필요한 항목을 직접 선택해 주세요.",
+    reasonCode: "MODEL_GUIDE",
+    actionCandidate: {
+      actionType: "WAIT_FOR_USER",
+      targetElementId: "el-final-approve",
+      role: "button",
+      accessibleLabel: "Demo 예금 최종 승인",
+      guide: "필요한 항목을 직접 선택해 주세요.",
+    },
+  });
+});
+
+test("C-GUIDE-GEMINI-14 rejects AUTO_EXECUTE without sourceSnapshotId", async () => {
+  const { request: input, decision } = await scriptedDecision("03");
+  await rejectsContract(input, { ...decision, sourceSnapshotId: null });
+});
+
+test("C-GUIDE-GEMINI-15 rejects nonexistent and duplicate internal references", async () => {
+  const { request: input, decision } = await scriptedDecision("04");
+  await rejectsContract(input, {
+    ...decision,
+    actionCandidate: { ...decision.actionCandidate!, targetElementId: "el-missing" },
+  });
+
+  const duplicateInput = structuredClone(input);
+  duplicateInput.snapshot!.sanitizedDomSnapshot.elements.push({
+    ...duplicateInput.snapshot!.sanitizedDomSnapshot.elements[0]!,
+  });
+  await rejectsContract(duplicateInput, decision);
 });

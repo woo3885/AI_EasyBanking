@@ -85,9 +85,25 @@ export const AGENT_MODES = [
 
 export type AgentMode = (typeof AGENT_MODES)[number];
 
-/** Day 1 intentionally carries no target identity. */
-export interface Day1MinimalActionCandidate {
-  actionType: string;
+export const CONVERSATION_ACTION_TYPES = [
+  "CLICK",
+  "TYPE",
+  "WAIT_FOR_USER",
+] as const;
+
+export type ConversationActionType =
+  (typeof CONVERSATION_ACTION_TYPES)[number];
+
+/**
+ * B↔C internal target reference. Backend must revalidate elementId against
+ * sourceSnapshotId before creating any public targetId or Browser action.
+ */
+export interface ConversationActionCandidate {
+  actionType: ConversationActionType;
+  targetElementId: string;
+  role: string;
+  accessibleLabel: string;
+  guide: string;
 }
 
 export interface AgentDecision {
@@ -103,7 +119,7 @@ export interface AgentDecision {
   sourceSnapshotId: string | null;
   goalPatch: UserGoalPatch | null;
   question: { fieldKey: string } | null;
-  actionCandidate: Day1MinimalActionCandidate | null;
+  actionCandidate: ConversationActionCandidate | null;
 }
 
 export interface ConversationAgentRequest {

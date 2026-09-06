@@ -22,7 +22,7 @@ async function withServer(
   }
 }
 
-test("C-D2 conversation HTTP returns protected product GUIDE_USER without target identity", async () => {
+test("C-D2 conversation HTTP returns GUIDE_USER with an internal snapshot target", async () => {
   const request = C_D2_DEPOSIT_FIXTURES.find((fixture) => fixture.id === "04")!.request;
   await withServer(async (url) => {
     const response = await fetch(url, {
@@ -33,8 +33,13 @@ test("C-D2 conversation HTTP returns protected product GUIDE_USER without target
     const body = await response.json() as Record<string, unknown>;
     assert.equal(response.status, 200);
     assert.equal(body.mode, "GUIDE_USER");
-    assert.deepEqual(body.actionCandidate, { actionType: "WAIT_FOR_USER" });
-    assert.equal("elementId" in (body.actionCandidate as object), false);
+    assert.deepEqual(body.actionCandidate, {
+      actionType: "WAIT_FOR_USER",
+      targetElementId: "el-product-12m",
+      role: "button",
+      accessibleLabel: "12개월 정기예금 선택",
+      guide: "가입할 예금 상품을 직접 선택해 주세요.",
+    });
     assert.equal(body.sourceSnapshotId, "snap-04");
   });
 });
@@ -56,7 +61,13 @@ test("C-D2 conversation HTTP rejects a model attempt to auto-select a product", 
         sourceSnapshotId: input.snapshot!.sourceSnapshotId,
         goalPatch: null,
         question: null,
-        actionCandidate: { actionType: "CLICK" },
+        actionCandidate: {
+          actionType: "CLICK",
+          targetElementId: "el-product-12m",
+          role: "button",
+          accessibleLabel: "12개월 정기예금 선택",
+          guide: "상품을 자동으로 선택합니다.",
+        },
       };
     },
   };

@@ -47,8 +47,14 @@ test("C-D2-04 protected and stale targets cannot become AUTO_EXECUTE", () => {
   const unsafe = {
     ...decideConversationInteraction(protectedRequest),
     mode: "AUTO_EXECUTE" as const,
-    message: "자동으로 선택합니다.",
-    actionCandidate: { actionType: "CLICK" },
+    message: "다음 화면으로 이동합니다.",
+    actionCandidate: {
+      actionType: "CLICK" as const,
+      targetElementId: "el-product",
+      role: "button",
+      accessibleLabel: "정기예금 상품",
+      guide: "다음 화면으로 이동합니다.",
+    },
   };
   const result = validateConversationInteractionDecision(protectedRequest, unsafe);
   assert.equal(result.valid, false);

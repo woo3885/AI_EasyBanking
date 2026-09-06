@@ -93,6 +93,28 @@ test("C-D1 AgentDecision strict and semantic validation", () => {
     question: null,
     sourceSnapshotId: null,
   }));
+  const internalAction = {
+    ...askUserDecision,
+    mode: "AUTO_EXECUTE",
+    question: null,
+    sourceSnapshotId: "snapshot-1",
+    actionCandidate: {
+      actionType: "CLICK",
+      targetElementId: "el-snapshot-1-001",
+      role: "button",
+      accessibleLabel: "예금 메뉴",
+      guide: "다음 화면으로 이동합니다.",
+    },
+  };
+  valid(validateAgentDecision(internalAction));
+  invalid(validateAgentDecision({
+    ...internalAction,
+    actionCandidate: { actionType: "CLICK" },
+  }));
+  invalid(validateAgentDecision({
+    ...internalAction,
+    actionCandidate: { ...internalAction.actionCandidate, targetId: "public-target" },
+  }));
   invalid(validateAgentDecision({
     ...askUserDecision,
     mode: "FINAL_CONFIRMATION_REQUIRED",
