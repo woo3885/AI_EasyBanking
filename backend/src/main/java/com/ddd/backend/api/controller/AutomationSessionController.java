@@ -8,6 +8,8 @@ import com.ddd.backend.api.dto.session.SubmitDecisionRequest;
 import com.ddd.backend.api.dto.session.CompleteSecureInputRequest;
 import com.ddd.backend.api.dto.session.SecureInputSubmissionResponse;
 import com.ddd.backend.api.dto.conversation.SessionMessageAcceptedResponse;
+import com.ddd.backend.api.dto.conversation.UserBrowserBridgeBootstrapResponse;
+import com.ddd.backend.conversation.bridge.UserBrowserBridgeService;
 import com.ddd.backend.conversation.ConversationService;
 import com.ddd.backend.conversation.MessageAcceptance;
 import com.ddd.backend.conversation.agent.ConversationAgentAsyncProcessor;
@@ -39,6 +41,7 @@ public class AutomationSessionController {
     private final SecureInputTransportPolicy secureInputTransportPolicy;
     private ConversationService conversationService;
     private ConversationAgentAsyncProcessor conversationAgentProcessor;
+    private UserBrowserBridgeService userBrowserBridgeService;
 
     @Autowired(required = false)
     void setConversationService(ConversationService conversationService) {
@@ -48,6 +51,11 @@ public class AutomationSessionController {
     @Autowired(required = false)
     void setConversationAgentProcessor(ConversationAgentAsyncProcessor processor) {
         this.conversationAgentProcessor = processor;
+    }
+
+    @Autowired(required = false)
+    void setUserBrowserBridgeService(UserBrowserBridgeService service) {
+        this.userBrowserBridgeService = service;
     }
 
     @Autowired
@@ -91,7 +99,8 @@ public class AutomationSessionController {
     @PostMapping
     public ResponseEntity<ApiResponse<?>>
     createSession(
-            @Valid @RequestBody CreateSessionRequest request
+            @Valid @RequestBody CreateSessionRequest request,
+            HttpServletRequest httpRequest
     ) {
         String sessionContent = request.resolvedContent();
         if (request.usesConversationContract()) {
@@ -119,8 +128,15 @@ public class AutomationSessionController {
                 conversationAgentProcessor.submit(session.getSessionId(), acceptance,
                         request.content(), null);
             }
+            var issuedBinding = userBrowserBridgeService == null
+                    ? null
+                    : userBrowserBridgeService.issueIfAvailable(
+                            session.getSessionId(), httpRequest.getHeader("Origin"));
+            UserBrowserBridgeBootstrapResponse bridgeBinding = issuedBinding == null
+                    ? null
+                    : UserBrowserBridgeBootstrapResponse.from(issuedBinding);
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.success(
-                    SessionMessageAcceptedResponse.from(acceptance, session.getStatus()),
+                    SessionMessageAcceptedResponse.from(acceptance, session.getStatus(), bridgeBinding),
                     "메시지가 접수되었습니다. AI 판단이나 실행 성공을 의미하지 않습니다."));
         }
 

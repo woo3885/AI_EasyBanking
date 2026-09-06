@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import com.ddd.backend.security.secureinput.SecureInputRegistry;
 import com.ddd.backend.conversation.ConversationService;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeService;
+import com.ddd.backend.conversation.bridge.UserBrowserBridgeRegistry;
 import com.ddd.backend.conversation.overlay.OverlayTargetStore;
 import com.ddd.backend.conversation.gate.ConversationProtectedGateRegistry;
 import com.ddd.backend.conversation.overlay.ConversationObservationResumeAdapter;
@@ -72,6 +73,7 @@ public class AutomationSessionService {
     private SecureInputRegistry secureInputRegistry;
     private ConversationService conversationService;
     private DemoAgentBridgeService demoAgentBridgeService;
+    private UserBrowserBridgeRegistry userBrowserBridgeRegistry;
     private OverlayTargetStore overlayTargets;
     private ConversationProtectedGateRegistry conversationProtectedGates;
     private ConversationObservationResumeAdapter conversationObservationResumeAdapter;
@@ -89,6 +91,11 @@ public class AutomationSessionService {
     @Autowired(required = false)
     void setDemoAgentBridgeService(DemoAgentBridgeService demoAgentBridgeService) {
         this.demoAgentBridgeService = demoAgentBridgeService;
+    }
+
+    @Autowired(required = false)
+    void setUserBrowserBridgeRegistry(UserBrowserBridgeRegistry registry) {
+        this.userBrowserBridgeRegistry = registry;
     }
 
     @Autowired(required = false)
@@ -726,6 +733,7 @@ public class AutomationSessionService {
     private void cleanupDemoAgentBridgeSafely(String sessionId) {
         try {
             if (demoAgentBridgeService != null) demoAgentBridgeService.removeSession(sessionId);
+            if (userBrowserBridgeRegistry != null) userBrowserBridgeRegistry.removeSession(sessionId);
         } catch (RuntimeException ignored) {
             // Bridge cleanup failure must not block session cleanup.
         }

@@ -1,9 +1,9 @@
 package com.ddd.backend.api.controller;
 
 import com.ddd.backend.config.RestCorsProperties;
-import com.ddd.backend.conversation.bridge.DemoAgentBridgeBinding;
+import com.ddd.backend.conversation.bridge.UserBrowserBridgeBinding;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeAuthenticationException;
-import com.ddd.backend.conversation.bridge.DemoAgentBridgeRegistry;
+import com.ddd.backend.conversation.bridge.UserBrowserBridgeRegistry;
 import com.ddd.backend.domain.session.AutomationSession;
 import com.ddd.backend.service.AutomationSessionService;
 import com.ddd.backend.conversation.overlay.OverlayTargetStore;
@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ConversationBridgeControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean AutomationSessionService sessions;
-    @MockitoBean DemoAgentBridgeRegistry bridges;
+    @MockitoBean UserBrowserBridgeRegistry bridges;
     @MockitoBean OverlayTargetStore targets;
 
     private final Instant expiresAt = Instant.parse("2026-09-06T12:00:00Z");
@@ -37,7 +37,7 @@ class ConversationBridgeControllerTest {
         when(sessions.getSession("session-1"))
                 .thenReturn(AutomationSession.create("request without secret"));
         when(bridges.require("session-1", "secret", "http://127.0.0.1:5190", "page-1"))
-                .thenReturn(new DemoAgentBridgeBinding(
+                .thenReturn(new UserBrowserBridgeBinding(
                         "session-1", "secret", "page-1",
                         "http://127.0.0.1:5190", expiresAt));
         when(bridges.require("session-1", null, "http://127.0.0.1:5190", null))
