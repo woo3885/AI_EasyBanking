@@ -66,6 +66,8 @@ class BrowserNavigationProductionFlowTest {
         assertThat(bindings.find(sessionId)).get()
                 .extracting(UserBrowserBridgeBinding::pageIdentity)
                 .isEqualTo(navigation.destinationPageIdentity());
+        assertThat(bindings.find(sessionId).orElseThrow().currentRoute())
+                .isEqualTo("/deposit/products");
         assertThat(eventStore.events(sessionId)).extracting(ConversationEvent::eventType)
                 .containsExactly("NAVIGATION_REQUIRED", "PAGE_READY_OBSERVED");
         org.mockito.Mockito.verify(resume).resumeOnce(navigation.withStatus(PendingBrowserNavigation.Status.CONSUMED));

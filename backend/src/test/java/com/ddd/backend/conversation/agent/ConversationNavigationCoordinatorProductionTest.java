@@ -8,6 +8,9 @@ import com.ddd.backend.conversation.event.ConversationEvent;
 import com.ddd.backend.conversation.event.ConversationEventPublisher;
 import com.ddd.backend.conversation.event.ConversationEventStore;
 import com.ddd.backend.conversation.navigation.*;
+import com.ddd.backend.conversation.goal.GoalRouteCompatibilityPolicy;
+import com.ddd.backend.conversation.goal.UserGoal;
+import com.ddd.backend.conversation.goal.UserGoalPatch;
 import com.ddd.backend.domain.session.AutomationSession;
 import com.ddd.backend.domain.session.WorkflowStatus;
 import com.ddd.backend.infrastructure.session.InMemoryAutomationSessionRepository;
@@ -36,19 +39,23 @@ class ConversationNavigationCoordinatorProductionTest {
         var conversations = new ConversationService(sessions, stateStore, mailbox,
                 new ConversationMessagePolicy(), eventStore);
         ConversationState state = stateStore.getOrCreate(sessionId);
-        state.appendUserMessage("request-1", "message-1", "예금 상품을 보여줘",
+        state.appendUserMessage("request-1", "message-1", "100만 원으로 12개월 예금 가입을 도와줘",
                 Instant.now(), MessageQueueStatus.ACTIVE);
+        state.applyGoalPatch(state.goal().goalId(), 0, "message-1",
+                new UserGoalPatch(0, "DEPOSIT", new UserGoal.Amount("1000000", "KRW"),
+                        new UserGoal.Duration(12, "MONTH"), List.of(), null, null), null);
         var events = new ConversationEventPublisher(eventStore, mock(SimpMessagingTemplate.class));
         var userBindings = new UserBrowserBridgeRegistry();
         userBindings.put(new UserBrowserBridgeBinding(sessionId, "binding-1", "token-1", "page-1",
-                "https://frontend.example", Instant.now().plusSeconds(600)));
+                "/transfer/accounts", "https://frontend.example", Instant.now().plusSeconds(600)));
         @SuppressWarnings("unchecked") ObjectProvider<BrowserPageReadyResumePort> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(mock(BrowserPageReadyResumePort.class));
         var navigationService = new BrowserNavigationService(sessions, userBindings,
                 new PendingBrowserNavigationRegistry(), new BrowserNavigationRoutePolicy(), events, provider);
         var decisionRegistry = new NavigationDecisionRegistry();
         var adapter = new ConversationNavigationAdapter(navigationService,
-                new BrowserSemanticRouteMapper(), decisionRegistry, userBindings);
+                new BrowserSemanticRouteMapper(), decisionRegistry, userBindings,
+                new GoalRouteCompatibilityPolicy());
         var validator = new ConversationAgentContractValidator(new ConversationMessagePolicy());
         var coordinator = new ConversationAgentCoordinator(conversations, mailbox, sessions,
                 mock(ConversationAgentClient.class), validator, events);
@@ -59,13 +66,14 @@ class ConversationNavigationCoordinatorProductionTest {
                 "request-1", "message-1", state.goal().goalId(), state.goalRevision(),
                 ConversationInteractionMode.NAVIGATION_REQUIRED,
                 "예금 상품 화면으로 이동합니다.", 0.95, "ROUTE_REQUIRED", "PAGE_READY",
-                "snapshot-1", null, null, null, "decision-1",
-                new ConversationAgentDecision.NavigationCandidate(
+                "snapshot-1", null, null, null,
+                new ConversationAgentDecision.NavigationCandidate("decision-1",
                         BrowserSemanticRoute.DEPOSIT_PRODUCTS, BrowserNavigationMode.SPA_PUSH));
 
         coordinator.applyObservedDomDecision(sessionId, validator.validate(
                 new ConversationAgentRequest(sessionId, "request-1", "message-1", state.sequence(),
-                        state.goal(), new ConversationAgentRequest.UserMessage("예금 상품을 보여줘", null),
+                        state.goal(), new ConversationAgentRequest.UserMessage(
+                                "100만 원으로 12개월 예금 가입을 도와줘", null),
                         new ConversationAgentRequest.SnapshotContext("snapshot-1", "playwright-page", snapshot)),
                 decision), snapshot);
         coordinator.applyObservedDomDecision(sessionId, decision, snapshot);

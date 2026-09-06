@@ -74,6 +74,20 @@ public final class UserBrowserBridgeRegistry {
         return rotated;
     }
 
+    public synchronized UserBrowserBridgeBinding rotatePageIdentity(
+            String sessionId, String browserBindingId, String expectedPageIdentity,
+            String destinationPageIdentity, String renderedRoute) {
+        UserBrowserBridgeBinding current = find(sessionId)
+                .orElseThrow(DemoAgentBridgeAuthenticationException::new);
+        if (!current.browserBindingId().equals(browserBindingId)
+                || !current.pageIdentity().equals(expectedPageIdentity)) {
+            throw new DemoAgentBridgeAuthenticationException();
+        }
+        UserBrowserBridgeBinding rotated = current.withPage(destinationPageIdentity, renderedRoute);
+        bindings.put(sessionId, rotated);
+        return rotated;
+    }
+
     public void removeSession(String sessionId) {
         if (sessionId != null) bindings.remove(sessionId);
     }

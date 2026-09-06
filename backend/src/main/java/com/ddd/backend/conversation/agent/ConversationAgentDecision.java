@@ -7,7 +7,7 @@ public record ConversationAgentDecision(
         ConversationInteractionMode mode, String message, double confidence, String reasonCode,
         String nextCondition, String sourceSnapshotId, UserGoalPatch goalPatch,
         QuestionCandidate question, ActionCandidate actionCandidate,
-        String decisionId, NavigationCandidate navigationCandidate
+        NavigationCandidate navigationCandidate
 ) {
     public ConversationAgentDecision(
             String requestId, String requestMessageId, String goalId, long baseGoalRevision,
@@ -15,12 +15,12 @@ public record ConversationAgentDecision(
             String nextCondition, String sourceSnapshotId, UserGoalPatch goalPatch,
             QuestionCandidate question, ActionCandidate actionCandidate) {
         this(requestId, requestMessageId, goalId, baseGoalRevision, mode, message, confidence,
-                reasonCode, nextCondition, sourceSnapshotId, goalPatch, question, actionCandidate,
-                null, null);
+                reasonCode, nextCondition, sourceSnapshotId, goalPatch, question, actionCandidate, null);
     }
 
     public record QuestionCandidate(String fieldKey) { }
     public record NavigationCandidate(
+            String decisionId,
             BrowserSemanticRoute semanticRoute,
             BrowserNavigationMode navigationMode
     ) { }

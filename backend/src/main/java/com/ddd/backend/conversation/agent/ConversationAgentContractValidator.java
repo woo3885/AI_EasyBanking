@@ -61,13 +61,14 @@ public final class ConversationAgentContractValidator {
             }
         }
         if (decision.mode() == ConversationInteractionMode.NAVIGATION_REQUIRED) {
-            if (blank(decision.decisionId()) || decision.navigationCandidate() == null
+            if (decision.navigationCandidate() == null
+                    || blank(decision.navigationCandidate().decisionId())
                     || decision.navigationCandidate().semanticRoute() == null
                     || decision.navigationCandidate().navigationMode() == null
                     || decision.actionCandidate() != null || decision.question() != null) {
                 throw new IllegalArgumentException("NAVIGATION_REQUIRED requires a structured navigationCandidate");
             }
-        } else if (decision.navigationCandidate() != null || decision.decisionId() != null) {
+        } else if (decision.navigationCandidate() != null) {
             throw new IllegalArgumentException("Navigation identity is only allowed for NAVIGATION_REQUIRED");
         }
         if ((decision.mode() == ConversationInteractionMode.SECURE_INPUT_REQUIRED

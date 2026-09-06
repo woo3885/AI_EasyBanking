@@ -4,6 +4,8 @@ import com.ddd.backend.automation.dom.ElementRegistry;
 import com.ddd.backend.automation.dom.SanitizedDomSnapshot;
 import com.ddd.backend.automation.session.BrowserSessionManager;
 import com.ddd.backend.conversation.ConversationMessagePolicy;
+import com.ddd.backend.conversation.ConversationService;
+import com.ddd.backend.conversation.goal.GoalRouteCompatibilityPolicy;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeBinding;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeRegistry;
 import com.ddd.backend.conversation.bridge.UserBrowserBridgeRegistry;
@@ -34,6 +36,8 @@ public final class OverlayTargetService {
     private final ConversationMessagePolicy textPolicy;
     private UserBrowserBridgeRegistry userBrowserBindings;
     private BrowserNavigationService browserNavigations;
+    private ConversationService conversations;
+    private GoalRouteCompatibilityPolicy goalRoutes;
 
     public OverlayTargetService(BrowserSessionManager browsers, ElementRegistry elements,
             DemoAgentBridgeRegistry bridges, OverlayTargetStore targets,
@@ -53,6 +57,13 @@ public final class OverlayTargetService {
         this.browserNavigations = navigations;
     }
 
+    @Autowired(required = false)
+    void setConversationGoalRouteGate(
+            ConversationService conversations, GoalRouteCompatibilityPolicy goalRoutes) {
+        this.conversations = conversations;
+        this.goalRoutes = goalRoutes;
+    }
+
     public PublicOverlayTarget create(String sessionId, String pageIdentity,
             SanitizedDomSnapshot snapshot, String internalElementId, String guide) {
         DemoAgentBridgeBinding bridge = bridges.find(sessionId)
@@ -61,11 +72,17 @@ public final class OverlayTargetService {
         if (browserNavigations != null && browserNavigations.blocksTarget(sessionId)) {
             throw new OverlayTargetException(OverlayTargetError.TARGET_NOT_INTERACTABLE);
         }
-        String publicPageIdentity = userBrowserBindings == null
-                ? pageIdentity
+        var userBinding = userBrowserBindings == null ? null
                 : userBrowserBindings.find(sessionId)
-                        .orElseThrow(() -> new OverlayTargetException(OverlayTargetError.BRIDGE_TOKEN_INVALID))
-                        .pageIdentity();
+                        .orElseThrow(() -> new OverlayTargetException(OverlayTargetError.BRIDGE_TOKEN_INVALID));
+        if (conversations != null && goalRoutes != null) {
+            String userRoute = userBinding == null ? null : userBinding.currentRoute();
+            if (!goalRoutes.allowsOverlay(
+                    conversations.state(sessionId).goal(), userRoute, snapshot.page().url())) {
+                throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
+            }
+        }
+        String publicPageIdentity = userBinding == null ? pageIdentity : userBinding.pageIdentity();
         SanitizedDomSnapshot.ElementSnapshot source = snapshot.elements().stream()
                 .filter(element -> element.elementId().equals(internalElementId)).findFirst()
                 .orElseThrow(() -> new OverlayTargetException(OverlayTargetError.TARGET_NOT_FOUND));
