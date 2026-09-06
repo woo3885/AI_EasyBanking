@@ -21,6 +21,7 @@ import com.ddd.backend.security.secureinput.SecureInputRegistry;
 import com.ddd.backend.conversation.ConversationService;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeService;
 import com.ddd.backend.conversation.bridge.UserBrowserBridgeRegistry;
+import com.ddd.backend.conversation.navigation.BrowserNavigationService;
 import com.ddd.backend.conversation.overlay.OverlayTargetStore;
 import com.ddd.backend.conversation.gate.ConversationProtectedGateRegistry;
 import com.ddd.backend.conversation.overlay.ConversationObservationResumeAdapter;
@@ -74,6 +75,7 @@ public class AutomationSessionService {
     private ConversationService conversationService;
     private DemoAgentBridgeService demoAgentBridgeService;
     private UserBrowserBridgeRegistry userBrowserBridgeRegistry;
+    private BrowserNavigationService browserNavigationService;
     private OverlayTargetStore overlayTargets;
     private ConversationProtectedGateRegistry conversationProtectedGates;
     private ConversationObservationResumeAdapter conversationObservationResumeAdapter;
@@ -96,6 +98,11 @@ public class AutomationSessionService {
     @Autowired(required = false)
     void setUserBrowserBridgeRegistry(UserBrowserBridgeRegistry registry) {
         this.userBrowserBridgeRegistry = registry;
+    }
+
+    @Autowired(required = false)
+    void setBrowserNavigationService(BrowserNavigationService service) {
+        this.browserNavigationService = service;
     }
 
     @Autowired(required = false)
@@ -734,6 +741,7 @@ public class AutomationSessionService {
         try {
             if (demoAgentBridgeService != null) demoAgentBridgeService.removeSession(sessionId);
             if (userBrowserBridgeRegistry != null) userBrowserBridgeRegistry.removeSession(sessionId);
+            if (browserNavigationService != null) browserNavigationService.removeSession(sessionId);
         } catch (RuntimeException ignored) {
             // Bridge cleanup failure must not block session cleanup.
         }

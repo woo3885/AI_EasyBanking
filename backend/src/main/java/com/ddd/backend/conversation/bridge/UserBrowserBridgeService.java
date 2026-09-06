@@ -9,6 +9,7 @@ import java.util.UUID;
 
 @Service
 public final class UserBrowserBridgeService {
+    private static final Duration MAX_USER_BROWSER_TTL = Duration.ofMinutes(5);
     private final DemoAgentBridgeRegistry playwrightBindings;
     private final UserBrowserBridgeRegistry browserBindings;
     private final DemoAgentBridgeProperties properties;
@@ -36,10 +37,12 @@ public final class UserBrowserBridgeService {
         if (ttl == null || ttl.isZero() || ttl.isNegative()) {
             throw new IllegalStateException("사용자 Browser bridge TTL이 올바르지 않습니다.");
         }
+        if (ttl.compareTo(MAX_USER_BROWSER_TTL) > 0) ttl = MAX_USER_BROWSER_TTL;
         UserBrowserBridgeBinding binding = new UserBrowserBridgeBinding(
                 sessionId,
+                "browser-binding-" + UUID.randomUUID(),
                 UUID.randomUUID().toString(),
-                playwright.pageIdentity(),
+                "browser-page-" + UUID.randomUUID(),
                 origin,
                 Instant.now().plus(ttl));
         browserBindings.put(binding);

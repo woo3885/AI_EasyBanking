@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 public final class ConversationBridgeController {
     public static final String BRIDGE_TOKEN_HEADER = "X-DDD-Bridge-Token";
     public static final String PAGE_IDENTITY_HEADER = "X-DDD-Page-Identity";
+    public static final String BROWSER_BINDING_ID_HEADER = "X-DDD-Browser-Binding-Id";
 
     private final UserBrowserBridgeRegistry bridges;
     private final AutomationSessionService sessions;
@@ -37,11 +38,12 @@ public final class ConversationBridgeController {
             @PathVariable String sessionId,
             @RequestHeader(value = BRIDGE_TOKEN_HEADER, required = false) String bridgeToken,
             @RequestHeader(value = PAGE_IDENTITY_HEADER, required = false) String pageIdentity,
+            @RequestHeader(value = BROWSER_BINDING_ID_HEADER, required = false) String browserBindingId,
             @RequestHeader(value = "Origin", required = false) String origin
     ) {
         sessions.getSession(sessionId);
         UserBrowserBridgeBinding binding = bridges.require(
-                sessionId, bridgeToken, origin, pageIdentity);
+                sessionId, bridgeToken, origin, browserBindingId, pageIdentity);
         return ApiResponse.success(ConversationBridgeRecoveryResponse.of(
                 binding.sessionId(), binding.pageIdentity(), binding.expiresAt(),
                 targets.active(sessionId, pageIdentity).orElse(null)));

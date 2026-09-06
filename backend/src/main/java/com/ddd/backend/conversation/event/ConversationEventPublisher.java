@@ -5,6 +5,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 import com.ddd.backend.domain.session.WorkflowStatus;
 import com.ddd.backend.conversation.overlay.*;
+import com.ddd.backend.conversation.navigation.PendingBrowserNavigation;
 
 @Component
 public final class ConversationEventPublisher {
@@ -41,6 +42,16 @@ public final class ConversationEventPublisher {
     public UserActionObservedEvent userActionObserved(PublicOverlayTarget target,
             String observationId, String requestId, String resultingSnapshotId, Instant at) {
         return publish(store.userActionObserved(target, observationId, requestId, resultingSnapshotId, at));
+    }
+    public NavigationRequiredEvent navigationRequired(
+            PendingBrowserNavigation navigation, String guide, Instant at) {
+        return publish(store.navigationRequired(navigation, guide, at));
+    }
+    public PageReadyObservedEvent pageReadyObserved(PendingBrowserNavigation navigation, Instant at) {
+        return publish(store.pageReadyObserved(navigation, at));
+    }
+    public NavigationClearEvent navigationClear(PendingBrowserNavigation navigation) {
+        return publish(store.navigationClear(navigation, Instant.now()));
     }
 
     private <T extends ConversationEvent> T publish(T event) {

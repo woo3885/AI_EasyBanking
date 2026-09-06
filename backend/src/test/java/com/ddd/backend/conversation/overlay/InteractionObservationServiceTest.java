@@ -57,7 +57,7 @@ class InteractionObservationServiceTest {
         SanitizedDomSnapshot resulting = snapshot("snap-2", "선택 완료");
         when(snapshots.createSnapshot("session-1")).thenReturn(resulting);
         UserBrowserBridgeRegistry bridges = new UserBrowserBridgeRegistry();
-        bridges.put(new UserBrowserBridgeBinding("session-1", "secret", "page-1",
+        bridges.put(new UserBrowserBridgeBinding("session-1", "binding-1", "secret", "page-1",
                 "http://127.0.0.1:5190", Instant.now().plusSeconds(300)));
         OverlayTargetStore targets = new OverlayTargetStore(Duration.ofMinutes(2), Clock.fixed(NOW, ZoneOffset.UTC));
         PublicOverlayTarget target = target();
@@ -79,7 +79,7 @@ class InteractionObservationServiceTest {
         var request = new InteractionObservationRequest("request-1", "target-1", "snap-1",
                 "USER_CLICK", NOW);
 
-        var accepted = service.observe("session-1", "secret", "page-1",
+        var accepted = service.observe("session-1", "secret", "binding-1", "page-1",
                 "http://127.0.0.1:5190", request);
 
         assertThat(accepted.status()).isEqualTo("OBSERVATION_ACCEPTED");
@@ -91,7 +91,7 @@ class InteractionObservationServiceTest {
                 argThat(value -> value.targetId().equals("target-1") && value.consumedAt() != null),
                 eq(resulting));
 
-        assertThatThrownBy(() -> service.observe("session-1", "secret", "page-1",
+        assertThatThrownBy(() -> service.observe("session-1", "secret", "binding-1", "page-1",
                 "http://127.0.0.1:5190", request))
                 .isInstanceOfSatisfying(OverlayTargetException.class,
                         error -> assertThat(error.error()).isEqualTo(OverlayTargetError.OBSERVATION_DUPLICATE_REQUEST));
@@ -101,7 +101,7 @@ class InteractionObservationServiceTest {
     @Test
     void 보호_gate가_활성화되면_workflow상태와_무관하게_observation을_차단한다() {
         UserBrowserBridgeRegistry bridges = new UserBrowserBridgeRegistry();
-        bridges.put(new UserBrowserBridgeBinding("session-1", "secret", "page-1",
+        bridges.put(new UserBrowserBridgeBinding("session-1", "binding-1", "secret", "page-1",
                 "http://127.0.0.1:5190", Instant.now().plusSeconds(300)));
         OverlayTargetStore targets = mock(OverlayTargetStore.class);
         var sessions = new InMemoryAutomationSessionRepository();
@@ -123,7 +123,7 @@ class InteractionObservationServiceTest {
         var request = new InteractionObservationRequest(
                 "request-1", "target-1", "snap-1", "USER_CLICK", NOW);
 
-        assertThatThrownBy(() -> service.observe("session-1", "secret", "page-1",
+        assertThatThrownBy(() -> service.observe("session-1", "secret", "binding-1", "page-1",
                 "http://127.0.0.1:5190", request))
                 .isInstanceOfSatisfying(OverlayTargetException.class,
                         error -> assertThat(error.error()).isEqualTo(OverlayTargetError.TARGET_NOT_INTERACTABLE));
