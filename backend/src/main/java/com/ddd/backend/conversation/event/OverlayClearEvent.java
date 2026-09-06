@@ -6,5 +6,13 @@ import java.time.Instant;
 public record OverlayClearEvent(
         String eventId, long eventSequence, String eventType, String sessionId,
         String targetId, String pageIdentity, String sourceSnapshotId,
+        String publicTargetKey,
         OverlayClearReason reason, Instant occurredAt
-) implements ConversationEvent { }
+) implements ConversationEvent {
+    public OverlayClearEvent(String eventId, long eventSequence, String eventType, String sessionId,
+            String targetId, String pageIdentity, String sourceSnapshotId,
+            OverlayClearReason reason, Instant occurredAt) {
+        this(eventId, eventSequence, eventType, sessionId, targetId, pageIdentity,
+                sourceSnapshotId, null, reason, occurredAt);
+    }
+}

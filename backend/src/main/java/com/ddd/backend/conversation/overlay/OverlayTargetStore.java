@@ -164,6 +164,19 @@ public final class OverlayTargetStore {
 
     private void validateTarget(PublicOverlayTarget target) {
         if (target == null || target.coordinateSpace() != OverlayCoordinateSpace.VIEWPORT_CSS_PX) throw new IllegalArgumentException("target 좌표계가 올바르지 않습니다.");
+        if (target.contractVersion() == 2) {
+            if (target.materializationMode() != OverlayMaterializationMode.USER_DOM_PUBLIC_TARGET
+                    || target.locator() == null
+                    || !PublicTargetLocator.TYPE.equals(target.locator().type())
+                    || !PublicTargetKeyPolicy.isValid(target.locator().publicTargetKey())
+                    || !target.role().equals(target.locator().role())
+                    || !target.label().equals(target.locator().accessibleName())) {
+                throw new IllegalArgumentException("public target locator가 올바르지 않습니다.");
+            }
+        } else if (target.contractVersion() != 1
+                || target.materializationMode() != OverlayMaterializationMode.BACKEND_VIEWPORT_RECT) {
+            throw new IllegalArgumentException("지원하지 않는 Overlay 계약입니다.");
+        }
         requireText(target.targetId()); requireText(target.sessionId()); requireText(target.pageIdentity());
         requireText(target.sourceSnapshotId()); requireText(target.role()); requireText(target.label()); requireText(target.guide());
         if (target.actionMode() != OverlayActionMode.GUIDE_USER_CLICK
@@ -175,7 +188,8 @@ public final class OverlayTargetStore {
         var r = target.rectangle(); var v = target.viewport();
         if (r == null || v == null || !finite(r.x(), r.y(), r.width(), r.height(), v.width(), v.height())
                 || r.width() <= 0 || r.height() <= 0 || v.width() <= 0 || v.height() <= 0
-                || r.x() < -r.width() || r.y() < -r.height() || r.x() > v.width() || r.y() > v.height()) {
+                || target.contractVersion() == 1 && (r.x() < -r.width() || r.y() < -r.height()
+                || r.x() > v.width() || r.y() > v.height())) {
             throw new IllegalArgumentException("target rectangle 또는 viewport가 올바르지 않습니다.");
         }
         if (target.expiresAt() == null || !target.expiresAt().isAfter(target.createdAt())) throw new IllegalArgumentException("target 만료시각이 올바르지 않습니다.");
@@ -198,7 +212,7 @@ public final class OverlayTargetStore {
         private boolean inProgress;
         private ScheduledFuture<?> expirationTask;
         private Entry(PublicOverlayTarget target, String internalElementId, String sourceFingerprint) { this.target = target; this.internalElementId = internalElementId; this.sourceFingerprint = sourceFingerprint; }
-        private PublicOverlayTarget publicView() { return new PublicOverlayTarget(target.targetId(), target.sessionId(), target.pageIdentity(), target.sourceSnapshotId(), target.coordinateSpace(), target.rectangle(), target.viewport(), target.role(), target.label(), target.guide(), target.actionMode(), target.createdAt(), target.expiresAt(), consumedAt); }
+        private PublicOverlayTarget publicView() { return new PublicOverlayTarget(target.contractVersion(), target.materializationMode(), target.targetId(), target.sessionId(), target.pageIdentity(), target.sourceSnapshotId(), target.coordinateSpace(), target.rectangle(), target.viewport(), target.role(), target.label(), target.guide(), target.locator(), target.actionMode(), target.createdAt(), target.expiresAt(), consumedAt); }
         private void cancelExpiration() { if (expirationTask != null) expirationTask.cancel(false); }
     }
 }

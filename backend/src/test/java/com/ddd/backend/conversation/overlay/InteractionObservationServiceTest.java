@@ -46,6 +46,8 @@ class InteractionObservationServiceTest {
         Locator locator = mock(Locator.class);
         when(locator.isVisible()).thenReturn(true);
         when(locator.isEnabled()).thenReturn(true);
+        when(locator.getAttribute("data-ddd-public-target")).thenReturn("deposit-product-12m-select");
+        when(locator.getAttribute("aria-label")).thenReturn("12개월 정기예금 선택");
         when(locator.evaluate(anyString())).thenReturn(Map.of("x", 120, "y", 240, "width", 180, "height", 56));
         when(elements.resolveLocator(page, "session-1", "el-secret")).thenReturn(locator);
         when(browsers.execute(eq("session-1"), any(Duration.class), any())).thenAnswer(invocation -> {
@@ -54,7 +56,7 @@ class InteractionObservationServiceTest {
         });
 
         SanitizedDomSnapshot source = snapshot("snap-1", "선택 전");
-        SanitizedDomSnapshot resulting = snapshot("snap-2", "선택 완료");
+        SanitizedDomSnapshot resulting = snapshot("snap-2", "선택 전");
         when(snapshots.createSnapshot("session-1")).thenReturn(resulting);
         UserBrowserBridgeRegistry bridges = new UserBrowserBridgeRegistry();
         bridges.put(new UserBrowserBridgeBinding("session-1", "binding-1", "secret", "page-1",
@@ -77,7 +79,9 @@ class InteractionObservationServiceTest {
         var service = new InteractionObservationService(bridges, targets, browsers, elements,
                 snapshots, sessions, publisher, provider);
         var request = new InteractionObservationRequest("request-1", "target-1", "snap-1",
-                "USER_CLICK", NOW);
+                "deposit-product-12m-select", "button", OverlayActionMode.GUIDE_USER_CLICK,
+                new InteractionObservationRequest.LocalRectangle(10, 20, 200, 60),
+                new InteractionObservationRequest.ClickPosition(100, 50), "USER_CLICK", NOW);
 
         var accepted = service.observe("session-1", "secret", "binding-1", "page-1",
                 "http://127.0.0.1:5190", request);
@@ -131,11 +135,14 @@ class InteractionObservationServiceTest {
     }
 
     private PublicOverlayTarget target() {
-        return new PublicOverlayTarget("target-1", "session-1", "page-1", "snap-1",
+        return new PublicOverlayTarget(2, OverlayMaterializationMode.USER_DOM_PUBLIC_TARGET,
+                "target-1", "session-1", "page-1", "snap-1",
                 OverlayCoordinateSpace.VIEWPORT_CSS_PX,
                 new PublicOverlayTarget.Rectangle(120, 240, 180, 56),
-                new PublicOverlayTarget.Viewport(1280, 720), "button", "12개월 상품 선택",
-                "이 버튼을 직접 눌러 주세요.", OverlayActionMode.GUIDE_USER_CLICK,
+                new PublicOverlayTarget.Viewport(1280, 720), "button", "12개월 정기예금 선택",
+                "이 버튼을 직접 눌러 주세요.", new PublicTargetLocator(PublicTargetLocator.TYPE,
+                        "deposit-product-12m-select", "button", "12개월 정기예금 선택"),
+                OverlayActionMode.GUIDE_USER_CLICK,
                 NOW, NOW.plusSeconds(120), null);
     }
 

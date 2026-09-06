@@ -94,11 +94,19 @@ public final class OverlayTargetService {
         String label = safeText(source.ariaLabel() == null || source.ariaLabel().isBlank()
                 ? source.text() : source.ariaLabel(), 120);
         String safeGuide = safeText(guide, 200);
+        String publicTargetKey = source.publicTargetKey();
+        if (userBinding != null && !validPublicTargetKey(publicTargetKey)) {
+            throw new GuideUserMaterializationException(PageReadyResumeError.GUIDE_USER_TARGET_INVALID);
+        }
         Geometry geometry = browsers.execute(sessionId, TIMEOUT, page -> {
             Locator locator = elements.resolveLocator(page, sessionId, internalElementId);
             if (!locator.isVisible() || !locator.isEnabled()) throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
-            locator.scrollIntoViewIfNeeded();
-            if (!locator.isVisible() || !locator.isEnabled()) throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
+            if (userBinding != null) {
+                String resolvedKey = locator.getAttribute("data-ddd-public-target");
+                if (!publicTargetKey.equals(resolvedKey)) {
+                    throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
+                }
+            }
             Object raw = locator.evaluate("element => { const r=element.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height,viewportWidth:window.innerWidth,viewportHeight:window.innerHeight,topLevel:window===window.top}; }");
             Map<?, ?> values = (Map<?, ?>) raw;
             if (!Boolean.TRUE.equals(values.get("topLevel"))) throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
@@ -107,11 +115,17 @@ public final class OverlayTargetService {
         });
         Instant now = Instant.now();
         PublicOverlayTarget target = new PublicOverlayTarget(
+                userBinding == null ? 1 : 2,
+                userBinding == null ? OverlayMaterializationMode.BACKEND_VIEWPORT_RECT
+                        : OverlayMaterializationMode.USER_DOM_PUBLIC_TARGET,
                 UUID.randomUUID().toString(), sessionId, publicPageIdentity, snapshot.snapshotId(),
                 OverlayCoordinateSpace.VIEWPORT_CSS_PX,
                 new PublicOverlayTarget.Rectangle(geometry.x, geometry.y, geometry.width, geometry.height),
                 new PublicOverlayTarget.Viewport(geometry.viewportWidth, geometry.viewportHeight),
-                role, label, safeGuide, OverlayActionMode.GUIDE_USER_CLICK,
+                role, label, safeGuide,
+                userBinding == null ? null : new PublicTargetLocator(
+                        PublicTargetLocator.TYPE, publicTargetKey, role, label),
+                OverlayActionMode.GUIDE_USER_CLICK,
                 now, targets.expiresAt(), null);
         PublicOverlayTarget saved;
         try {
@@ -156,6 +170,9 @@ public final class OverlayTargetService {
         normalized = normalized.toLowerCase(Locale.ROOT);
         if (!ALLOWED_ROLES.contains(normalized)) throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
         return normalized;
+    }
+    private boolean validPublicTargetKey(String value) {
+        return PublicTargetKeyPolicy.isValid(value);
     }
     private String safeText(String value, int maxLength) {
         String safe = textPolicy.sanitize(value);

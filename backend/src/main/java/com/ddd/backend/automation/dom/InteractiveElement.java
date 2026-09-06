@@ -20,7 +20,8 @@ public record InteractiveElement(
         Double x,
         Double y,
         Double width,
-        Double height
+        Double height,
+        String publicTargetKey
 ) {
 
     public InteractiveElement {
@@ -91,6 +92,8 @@ public record InteractiveElement(
                         explicitPolicy
                 );
 
+        publicTargetKey = normalizeNullableText(publicTargetKey);
+
         boolean hasAnyCoordinate =
                 x != null
                         || y != null
@@ -115,6 +118,17 @@ public record InteractiveElement(
     /*
      * D14 시점의 기존 생성자와 호환.
      */
+    public InteractiveElement(
+            int index, String tagName, String text, String role, String ariaLabel,
+            String placeholder, String inputType, String domId, String name,
+            String autocomplete, String explicitPolicy, boolean visible, boolean enabled,
+            Boolean checked, Double x, Double y, Double width, Double height
+    ) {
+        this(index, tagName, text, role, ariaLabel, placeholder, inputType, domId,
+                name, autocomplete, explicitPolicy, visible, enabled, checked,
+                x, y, width, height, null);
+    }
+
     public InteractiveElement(
             int index,
             String tagName,
@@ -147,7 +161,8 @@ public record InteractiveElement(
                 x,
                 y,
                 width,
-                height
+                height,
+                null
         );
     }
 

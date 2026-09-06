@@ -36,11 +36,15 @@ class ProductTargetFingerprintProductionFlowTest {
                 page.route("**/deposit/products", route -> route.fulfill(new Route.FulfillOptions()
                         .setStatus(200).setContentType("text/html; charset=utf-8").setBody("""
                         <article><h2>12개월 정기예금</h2>
-                          <button onclick="document.body.dataset.selected='basic'">이 상품 선택</button>
+                          <button data-ddd-public-target="deposit-product-12m-select"
+                            aria-label="12개월 정기예금 선택"
+                            onclick="document.body.dataset.selected='basic'">이 상품 선택</button>
                         </article>
                         <div style="height: 900px"></div>
                         <article><h2>우대금리 정기예금</h2>
-                          <button onclick="document.body.dataset.selected='preferred'">이 상품 선택</button>
+                          <button data-ddd-public-target="deposit-product-preferred-select"
+                            aria-label="우대금리 정기예금 선택"
+                            onclick="document.body.dataset.selected='preferred'">이 상품 선택</button>
                         </article>
                         """)));
                 page.navigate("http://127.0.0.1:5190/deposit/products");
@@ -84,7 +88,7 @@ class ProductTargetFingerprintProductionFlowTest {
                         "상품을 선택해 주세요.", 1.0, "USER_ACTION_REQUIRED", "DOM_CHANGE",
                         request.snapshot().sourceSnapshotId(), null, null,
                         new ConversationAgentDecision.ActionCandidate("WAIT_FOR_USER", target.elementId(),
-                                "button", target.text(), "상품을 선택해 주세요."));
+                                "button", target.ariaLabel(), "상품을 선택해 주세요."));
             };
             var validator = new ConversationAgentContractValidator(new ConversationMessagePolicy());
             var domDecisions = new ConversationAgentDomDecisionService(
@@ -112,8 +116,13 @@ class ProductTargetFingerprintProductionFlowTest {
             PublicOverlayTarget target = targets.active(sessionId, "destination-page").orElseThrow();
             assertThat(target.pageIdentity()).isEqualTo("destination-page");
             assertThat(target.sourceSnapshotId()).isEqualTo(result.snapshot().snapshotId());
-            assertThat(target.label()).isEqualTo("우대금리 정기예금");
-            assertThat(target.rectangle().y()).isBetween(0.0, target.viewport().height());
+            assertThat(target.label()).isEqualTo("우대금리 정기예금 선택");
+            assertThat(target.contractVersion()).isEqualTo(2);
+            assertThat(target.materializationMode()).isEqualTo(
+                    OverlayMaterializationMode.USER_DOM_PUBLIC_TARGET);
+            assertThat(target.locator()).isEqualTo(new PublicTargetLocator(
+                    PublicTargetLocator.TYPE, "deposit-product-preferred-select",
+                    "button", "우대금리 정기예금 선택"));
         }
     }
 }
