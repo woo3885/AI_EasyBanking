@@ -15,6 +15,7 @@ import com.ddd.backend.conversation.overlay.OverlayTargetStore;
 import com.ddd.backend.conversation.gate.ConversationProtectedGateRegistry;
 import com.ddd.backend.conversation.overlay.OverlayTargetService;
 import com.ddd.backend.automation.dom.SanitizedDomSnapshot;
+import com.ddd.backend.conversation.navigation.ConversationNavigationAdapter;
 
 /** Day 1 ASK_USER orchestration. It never invokes Browser Action execution. */
 @Service
@@ -29,6 +30,7 @@ public final class ConversationAgentCoordinator {
     private OverlayTargetStore overlayTargets;
     private ConversationProtectedGateRegistry protectedGates;
     private OverlayTargetService overlayTargetService;
+    private ConversationNavigationAdapter navigationAdapter;
 
     public ConversationAgentCoordinator(ConversationService conversations, SessionMessageMailbox mailbox,
             AutomationSessionRepository sessions, ConversationAgentClient client,
@@ -55,6 +57,11 @@ public final class ConversationAgentCoordinator {
     @Autowired(required = false)
     void setOverlayTargetService(OverlayTargetService overlayTargetService) {
         this.overlayTargetService = overlayTargetService;
+    }
+
+    @Autowired(required = false)
+    void setNavigationAdapter(ConversationNavigationAdapter navigationAdapter) {
+        this.navigationAdapter = navigationAdapter;
     }
 
     public ConversationAgentDecision process(String sessionId, MessageAcceptance acceptance,
@@ -139,6 +146,7 @@ public final class ConversationAgentCoordinator {
             case COMPLETE -> WorkflowStatus.COMPLETED;
             case STOP -> WorkflowStatus.TERMINATED;
             case AUTO_EXECUTE -> WorkflowStatus.AI_EXECUTING;
+            case NAVIGATION_REQUIRED -> WorkflowStatus.PAGE_LOADING;
             default -> throw new IllegalArgumentException("Unsupported latest DOM decision mode");
         };
         if (overlayTargets != null) {
@@ -164,6 +172,12 @@ public final class ConversationAgentCoordinator {
             overlayTargetService.create(
                     sessionId, snapshot, candidate.targetElementId(), candidate.role(),
                     candidate.accessibleLabel(), candidate.guide());
+        }
+        if (decision.mode() == ConversationInteractionMode.NAVIGATION_REQUIRED) {
+            if (navigationAdapter == null) {
+                throw new IllegalStateException("Conversation navigation adapter가 준비되지 않았습니다.");
+            }
+            navigationAdapter.start(sessionId, state, decision);
         }
         session.transitionTo(status);
         sessions.save(session);

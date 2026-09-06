@@ -4,6 +4,7 @@ import com.ddd.backend.automation.dom.SanitizedDomSnapshot;
 import com.ddd.backend.automation.dom.SanitizedDomSnapshotService;
 import com.ddd.backend.conversation.ConversationState;
 import com.ddd.backend.conversation.MessageAcceptance;
+import com.ddd.backend.conversation.navigation.NavigationDecisionContext;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeBinding;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeRegistry;
 import org.springframework.stereotype.Service;
@@ -49,6 +50,28 @@ public class ConversationAgentDomDecisionService {
                 state.sequence(),
                 state.goal(),
                 new ConversationAgentRequest.UserMessage(content, answerToQuestionId),
+                new ConversationAgentRequest.SnapshotContext(
+                        snapshot.snapshotId(), bridge.pageIdentity(), snapshot));
+        return new DomDecisionResult(
+                validator.validate(request, client.decide(request)), snapshot);
+    }
+
+    public DomDecisionResult decideAfterNavigation(
+            String sessionId,
+            NavigationDecisionContext context,
+            ConversationState state
+    ) {
+        DemoAgentBridgeBinding bridge = bridges.find(sessionId)
+                .orElseThrow(() -> new IllegalStateException("Demo Agent bridge binding이 없습니다."));
+        SanitizedDomSnapshot snapshot = snapshots.createSnapshot(sessionId);
+        String content = state.requireMessage(context.requestMessageId()).content();
+        ConversationAgentRequest request = new ConversationAgentRequest(
+                sessionId,
+                context.requestId(),
+                context.requestMessageId(),
+                state.sequence(),
+                state.goal(),
+                new ConversationAgentRequest.UserMessage(content, null),
                 new ConversationAgentRequest.SnapshotContext(
                         snapshot.snapshotId(), bridge.pageIdentity(), snapshot));
         return new DomDecisionResult(

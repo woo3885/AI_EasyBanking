@@ -79,7 +79,10 @@ public final class BrowserNavigationService {
         Instant now = Instant.now();
         events.pageReadyObserved(consumed, now);
         BrowserPageReadyResumePort port = resumePort.getIfAvailable();
-        if (port != null) port.resumeOnce(consumed);
+        if (port == null) {
+            throw new IllegalStateException("Browser page-ready resume port가 준비되지 않았습니다.");
+        }
+        port.resumeOnce(consumed);
         return new BrowserPageReadyResponse(
                 sessionId, request.requestId(), consumed.navigationId(), rotated.browserBindingId(),
                 consumed.sourcePageIdentity(), rotated.pageIdentity(), consumed.routeRevision(),
