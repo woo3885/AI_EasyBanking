@@ -6,8 +6,8 @@ import com.ddd.backend.automation.dom.SanitizedDomSnapshot;
 import com.ddd.backend.automation.dom.SanitizedDomSnapshotService;
 import com.ddd.backend.automation.session.BrowserCommand;
 import com.ddd.backend.automation.session.BrowserSessionManager;
-import com.ddd.backend.conversation.bridge.DemoAgentBridgeBinding;
-import com.ddd.backend.conversation.bridge.DemoAgentBridgeRegistry;
+import com.ddd.backend.conversation.bridge.UserBrowserBridgeBinding;
+import com.ddd.backend.conversation.bridge.UserBrowserBridgeRegistry;
 import com.ddd.backend.conversation.event.ConversationEventPublisher;
 import com.ddd.backend.conversation.event.ConversationEventStore;
 import com.ddd.backend.domain.session.AutomationSession;
@@ -56,8 +56,8 @@ class InteractionObservationServiceTest {
         SanitizedDomSnapshot source = snapshot("snap-1", "선택 전");
         SanitizedDomSnapshot resulting = snapshot("snap-2", "선택 완료");
         when(snapshots.createSnapshot("session-1")).thenReturn(resulting);
-        DemoAgentBridgeRegistry bridges = new DemoAgentBridgeRegistry();
-        bridges.put(new DemoAgentBridgeBinding("session-1", "secret", "page-1",
+        UserBrowserBridgeRegistry bridges = new UserBrowserBridgeRegistry();
+        bridges.put(new UserBrowserBridgeBinding("session-1", "secret", "page-1",
                 "http://127.0.0.1:5190", Instant.now().plusSeconds(300)));
         OverlayTargetStore targets = new OverlayTargetStore(Duration.ofMinutes(2), Clock.fixed(NOW, ZoneOffset.UTC));
         PublicOverlayTarget target = target();
@@ -100,8 +100,8 @@ class InteractionObservationServiceTest {
 
     @Test
     void 보호_gate가_활성화되면_workflow상태와_무관하게_observation을_차단한다() {
-        DemoAgentBridgeRegistry bridges = new DemoAgentBridgeRegistry();
-        bridges.put(new DemoAgentBridgeBinding("session-1", "secret", "page-1",
+        UserBrowserBridgeRegistry bridges = new UserBrowserBridgeRegistry();
+        bridges.put(new UserBrowserBridgeBinding("session-1", "secret", "page-1",
                 "http://127.0.0.1:5190", Instant.now().plusSeconds(300)));
         OverlayTargetStore targets = mock(OverlayTargetStore.class);
         var sessions = new InMemoryAutomationSessionRepository();

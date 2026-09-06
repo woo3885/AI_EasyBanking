@@ -89,6 +89,19 @@ class ConversationServiceTest {
                 .isEqualTo(ConversationError.SENSITIVE_CONTENT);
     }
 
+    @Test
+    void 실제_active_question과_다른_questionId는_거부한다() {
+        service.acceptInitial(sessionId, "req-1", "msg-1", "100만원 예금", null);
+        service.state(sessionId).activateQuestion("question-current");
+
+        assertThatThrownBy(() -> service.acceptFollowUp(sessionId,
+                new SubmitSessionMessageRequest(
+                        "req-2", "msg-2", "12개월", "question-stale", 1L, 0L, null)))
+                .isInstanceOf(ConversationException.class)
+                .extracting(error -> ((ConversationException) error).error())
+                .isEqualTo(ConversationError.QUESTION_MISMATCH);
+    }
+
     private SubmitSessionMessageRequest request(
             String requestId,
             String messageId,
