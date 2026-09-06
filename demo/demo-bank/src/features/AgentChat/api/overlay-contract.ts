@@ -9,6 +9,7 @@ import type {
   OverlayTargetEvent,
   UserActionObservedEvent
 } from '../model/conversation-types';
+import { parseBrowserBridgeBinding } from './navigation-contract';
 
 const TARGET_ROLES = new Set(['button', 'link', 'radio', 'checkbox', 'option']);
 const CLEAR_REASONS = new Set([
@@ -181,9 +182,8 @@ export function parseUserActionObservedEvent(payload: unknown, context: Pick<Ove
 
 export function readDemoAgentBridge(value: unknown): DemoAgentBridgeBinding | null {
   const item = record(value);
-  if (!item || !exactKeys(item, ['sessionId', 'bridgeToken', 'pageIdentity']) ||
-      !safeId(item.sessionId) || !safeId(item.bridgeToken) || !safeId(item.pageIdentity)) return null;
-  return item as unknown as DemoAgentBridgeBinding;
+  if (!item || !safeId(item.sessionId)) return null;
+  return parseBrowserBridgeBinding(item, item.sessionId);
 }
 
 export function parseBridgeRecovery(payload: unknown, binding: DemoAgentBridgeBinding,

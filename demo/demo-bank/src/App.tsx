@@ -11,11 +11,18 @@ import {
   createTransferOtpPath,
   createTransferPasswordPath,
   createTransferRecipientsPath,
-  normalizePathname,
   ROUTES
 } from './constants/routes';
 import { demoAccounts, depositProducts } from './data/demo-data';
 import { transferRecipients } from './data/transfer-recipients';
+import AgentChatShell from './features/AgentChat/ui/AgentChatShell';
+import type { AgentConversationDependencies } from './features/AgentChat/hooks/use-agent-conversation';
+import { useEffect, useState } from 'react';
+
+import {
+  DEMO_BANK_SPA_NAVIGATION_EVENT,
+  readDemoBankPathname
+} from './navigation/demo-bank-spa';
 import DepositAmountPage from './pages/DepositAmountPage';
 import DepositCompletionPage from './pages/DepositCompletionPage';
 import DepositConfirmationPage from './pages/DepositConfirmationPage';
@@ -33,8 +40,7 @@ import TransferOtpPage from './pages/TransferOtpPage';
 import TransferPasswordPage from './pages/TransferPasswordPage';
 import TransferRecipientsPage from './pages/TransferRecipientsPage';
 
-export default function App() {
-  const currentPath = normalizePathname(window.location.pathname);
+function RouteContent({ currentPath }: { currentPath: string }) {
   const detailProduct = depositProducts.find(
     (product) =>
       createDepositProductDetailPath(product.id) === currentPath
@@ -185,4 +191,29 @@ export default function App() {
     default:
       return <NotFoundPage currentPath={currentPath} />;
   }
+}
+
+export interface AppProps {
+  agentChatDependencies?: AgentConversationDependencies;
+}
+
+export default function App({ agentChatDependencies }: AppProps = {}) {
+  const [currentPath, setCurrentPath] = useState(readDemoBankPathname);
+
+  useEffect(() => {
+    const updatePath = () => setCurrentPath(readDemoBankPathname());
+    window.addEventListener('popstate', updatePath);
+    window.addEventListener(DEMO_BANK_SPA_NAVIGATION_EVENT, updatePath);
+    return () => {
+      window.removeEventListener('popstate', updatePath);
+      window.removeEventListener(DEMO_BANK_SPA_NAVIGATION_EVENT, updatePath);
+    };
+  }, []);
+
+  return (
+    <div className="demo-bank-agent-workspace">
+      <RouteContent currentPath={currentPath} />
+      <AgentChatShell {...agentChatDependencies} />
+    </div>
+  );
 }

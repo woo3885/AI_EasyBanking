@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 
 import { ELEMENT_IDS, elementIdentity } from '../constants/element-ids';
 import { ROUTES } from '../constants/routes';
-import AgentChatShell from '../features/AgentChat/ui/AgentChatShell';
 
 interface DemoBankLayoutProps {
   pageId: string;
@@ -38,7 +37,6 @@ export default function DemoBankLayout({
   children
 }: DemoBankLayoutProps) {
   return (
-    <div className="demo-bank-agent-workspace">
       <div className="site-shell">
         <header className="site-header">
           <div className="header-content">
@@ -86,8 +84,5 @@ export default function DemoBankLayout({
           입력을 수행하지 않습니다.
         </footer>
       </div>
-
-      <AgentChatShell />
-    </div>
   );
 }

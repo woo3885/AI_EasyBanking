@@ -9,7 +9,10 @@ import AgentChatShell from '../../src/features/AgentChat/ui/AgentChatShell';
 
 function accepted(requestId: string, messageId: string, acceptedSequence: number) {
   return { sessionId: 'session-1', requestId, messageId, acceptedSequence, queueStatus: 'ACTIVE' as const,
-    workflowStatus: 'AI_EXECUTING' as const, acceptedAt: '2026-09-03T00:00:00Z', duplicate: false };
+    workflowStatus: 'AI_EXECUTING' as const, acceptedAt: '2026-09-03T00:00:00Z', duplicate: false,
+    bridgeBinding: { sessionId: 'session-1', browserBindingId: 'binding-1', bridgeToken: 'token-1',
+      pageIdentity: 'page-1', expiresAt: '2099-01-01T00:00:00Z',
+      recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY' as const } };
 }
 
 function questionSnapshot(): ConversationSnapshot {

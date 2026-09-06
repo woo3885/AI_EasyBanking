@@ -72,7 +72,9 @@ describe('same-page Overlay runtime contract', () => {
   });
 
   it('bridge의 optional active target을 identity와 함께 복원한다', () => {
-    const binding = { sessionId: 'session-1', bridgeToken: 'token-1', pageIdentity: 'page-1' };
+    const binding = { sessionId: 'session-1', browserBindingId: 'binding-1', bridgeToken: 'token-1',
+      pageIdentity: 'page-1', expiresAt: '2099-01-01T00:00:00Z',
+      recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY' as const };
     const payload = { success: true, data: { sessionId: 'session-1', pageIdentity: 'page-1',
       eventSubscription: '/topic/sessions/session-1/events',
       conversationSnapshotPath: '/api/v1/sessions/session-1/conversation',
@@ -83,7 +85,9 @@ describe('same-page Overlay runtime contract', () => {
   });
 
   it('accepts a bridge fixture that omits a null activeTarget', () => {
-    const binding = { sessionId: 'session-1', bridgeToken: 'token-1', pageIdentity: 'page-1' };
+    const binding = { sessionId: 'session-1', browserBindingId: 'binding-1', bridgeToken: 'token-1',
+      pageIdentity: 'page-1', expiresAt: '2099-01-01T00:00:00Z',
+      recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY' as const };
     const payload = { success: true, data: { sessionId: 'session-1', pageIdentity: 'page-1',
       eventSubscription: '/topic/sessions/session-1/events',
       conversationSnapshotPath: '/api/v1/sessions/session-1/conversation',

@@ -58,8 +58,12 @@ export interface PendingOverlayObservation {
 
 export interface DemoAgentBridgeBinding {
   sessionId: string;
+  browserBindingId: string;
   bridgeToken: string;
   pageIdentity: string;
+  expiresAt: string;
+  recoveryPath: string;
+  pageReadyStatus: 'READY';
 }
 
 export interface ConversationBridgeRecovery {

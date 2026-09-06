@@ -6,7 +6,11 @@ function ack(overrides: Record<string, unknown> = {}) {
   return new Response(JSON.stringify({ success: true, errorCode: null, message: '메시지가 접수되었습니다.', data: {
     sessionId: 'session-1', requestId: 'request-1', messageId: 'message-1', acceptedSequence: 1,
     queueStatus: 'ACTIVE', workflowStatus: 'SESSION_CREATED', acceptedAt: '2026-09-03T00:00:00Z',
-    duplicate: false, ...overrides
+    duplicate: false, bridgeBinding: {
+      sessionId: 'session-1', browserBindingId: 'binding-1', bridgeToken: 'token-1',
+      pageIdentity: 'page-1', expiresAt: '2099-01-01T00:00:00Z',
+      recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY'
+    }, ...overrides
   } }), { status: 202, headers: { 'Content-Type': 'application/json' } });
 }
 
@@ -15,8 +19,11 @@ describe('conversation HTTP client', () => {
     const fetcher = vi.fn().mockResolvedValue(ack());
     const client = createConversationHttpClient('http://127.0.0.1:8080/', fetcher);
     const controller = new AbortController();
-    await client.createSession({ requestId: 'request-1', messageId: 'message-1', content: '100만원으로 예금 가입해줘',
+    const accepted = await client.createSession({ requestId: 'request-1', messageId: 'message-1', content: '100만원으로 예금 가입해줘',
       siteId: 'demo-bank', initialPath: '/', clientOccurredAt: '2026-09-03T00:00:00Z' }, controller.signal);
+    expect(accepted.bridgeBinding).toMatchObject({
+      sessionId: 'session-1', browserBindingId: 'binding-1', pageIdentity: 'page-1'
+    });
     expect(fetcher).toHaveBeenCalledWith('http://127.0.0.1:8080/api/v1/sessions', expect.objectContaining({
       method: 'POST', body: JSON.stringify({ requestId: 'request-1', messageId: 'message-1',
         content: '100만원으로 예금 가입해줘', siteId: 'demo-bank', initialPath: '/',
@@ -49,5 +56,19 @@ describe('conversation HTTP client', () => {
     controller.abort();
     await expect(client.getSnapshot('session-1', controller.signal)).rejects.toThrow();
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('만료되거나 session이 다른 최초 bridgeBinding을 fail-closed 처리한다', async () => {
+    const expired = createConversationHttpClient('http://127.0.0.1:8080', vi.fn().mockResolvedValue(
+      ack({ bridgeBinding: {
+        sessionId: 'session-1', browserBindingId: 'binding-1', bridgeToken: 'token-1',
+        pageIdentity: 'page-1', expiresAt: '2020-01-01T00:00:00Z',
+        recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY'
+      } })
+    ));
+    await expect(expired.createSession({
+      requestId: 'request-1', messageId: 'message-1', content: '예금 가입',
+      siteId: 'demo-bank', initialPath: '/', clientOccurredAt: '2026-09-03T00:00:00Z'
+    }, new AbortController().signal)).rejects.toThrow('INVALID_ACK');
   });
 });
