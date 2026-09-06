@@ -39,13 +39,14 @@ export function createOverlayHttpClient(
   const bridgeHeaders = (binding: DemoAgentBridgeBinding) => ({
     Accept: 'application/json',
     'X-DDD-Bridge-Token': binding.bridgeToken,
+    'X-DDD-Browser-Binding-Id': binding.browserBindingId,
     'X-DDD-Page-Identity': binding.pageIdentity
   });
 
   return {
     async recoverBridge(binding, viewport, signal) {
       const response = await fetcher(
-        `${normalizedBase}/api/v1/sessions/${encodeURIComponent(binding.sessionId)}/conversation/bridge`,
+        `${normalizedBase}${binding.recoveryPath}`,
         { method: 'GET', headers: bridgeHeaders(binding), cache: 'no-store', signal }
       );
       const recovery = parseBridgeRecovery(await jsonResponse(response, 200), binding, viewport);

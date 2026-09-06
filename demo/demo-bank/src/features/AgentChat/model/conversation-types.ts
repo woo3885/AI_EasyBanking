@@ -8,6 +8,7 @@ import type {
   PendingOverlayObservation,
   PublicOverlayTarget
 } from './overlay-types';
+import type { PendingBrowserNavigation } from './navigation-types';
 
 export type ConversationRole = 'USER' | 'AI';
 export type ConversationMessageKind = 'MESSAGE' | 'QUESTION' | 'STATUS' | 'WARNING';
@@ -104,6 +105,8 @@ export interface ConversationState {
   activeTarget: PublicOverlayTarget | null;
   observationPhase: OverlayObservationPhase;
   pendingObservation: PendingOverlayObservation | null;
+  pendingNavigation: PendingBrowserNavigation | null;
+  observedNavigationId: string | null;
 }
 
 export interface ConversationSnapshot {
@@ -193,13 +196,69 @@ export interface UserActionObservedEvent extends ConversationEventBase {
   status: 'DOM_CHANGE_CONFIRMED';
 }
 
+export interface NavigationRequiredEvent extends PendingBrowserNavigation {
+  eventId: string;
+  eventSequence: number;
+  eventType: 'NAVIGATION_REQUIRED';
+  sessionId: string;
+  occurredAt: string;
+}
+
+export interface PageReadyObservedEvent {
+  eventId: string;
+  eventSequence: number;
+  eventType: 'PAGE_READY_OBSERVED';
+  sessionId: string;
+  navigationId: string;
+  browserBindingId: string;
+  sourcePageIdentity: string;
+  pageIdentity: string;
+  routeRevision: number;
+  occurredAt: string;
+}
+
+export interface NavigationClearEvent {
+  eventId: string;
+  eventSequence: number;
+  eventType: 'NAVIGATION_CLEAR';
+  sessionId: string;
+  navigationId: string;
+  browserBindingId: string;
+  sourcePageIdentity: string;
+  destinationPageIdentity: string;
+  routeRevision: number;
+  reason: string;
+  occurredAt: string;
+}
+
+export interface PageReadyResumeFailedEvent {
+  eventId: string;
+  eventSequence: number;
+  eventType: 'PAGE_READY_RESUME_FAILED';
+  sessionId: string;
+  navigationId: string;
+  errorCode:
+    | 'PAGE_READY_RESUME_FAILED'
+    | 'DESTINATION_SNAPSHOT_FAILED'
+    | 'OVERLAY_TARGET_NOT_FOUND'
+    | 'OVERLAY_TARGET_AMBIGUOUS'
+    | 'OVERLAY_TARGET_STALE_SNAPSHOT'
+    | 'OVERLAY_TARGET_POLICY_MISMATCH';
+  message: string;
+  occurredAt: string;
+}
+
 export type ConversationServerEvent =
   | UserMessageAcceptedEvent
   | AiQuestionEvent
   | AiMessageEvent
   | OverlayTargetEvent
   | OverlayClearEvent
-  | UserActionObservedEvent;
+  | UserActionObservedEvent
+  | NavigationRequiredEvent
+  | PageReadyObservedEvent
+  | NavigationClearEvent
+  | PageReadyResumeFailedEvent;
 
 export type ConversationAction =
   | { type: 'DRAFT_CHANGED'; draft: string }
@@ -212,6 +271,7 @@ export type ConversationAction =
   | { type: 'SAFE_ERROR_SET'; error: ConversationSafeError }
   | { type: 'SNAPSHOT_RESTORED'; snapshot: ConversationSnapshot }
   | { type: 'BRIDGE_RECOVERED'; pageIdentity: string; activeTarget: PublicOverlayTarget | null }
+  | { type: 'PAGE_READY_ACKNOWLEDGED'; navigationId: string; pageIdentity: string }
   | { type: 'OVERLAY_CLEARED_LOCAL' }
   | { type: 'OBSERVATION_STARTED'; observation: PendingOverlayObservation }
   | { type: 'OBSERVATION_ACKNOWLEDGED'; requestId: string; targetId: string }
@@ -241,6 +301,8 @@ export function createInitialConversationState(
     pageIdentity: null,
     activeTarget: null,
     observationPhase: 'IDLE',
-    pendingObservation: null
+    pendingObservation: null,
+    pendingNavigation: null,
+    observedNavigationId: null
   };
 }

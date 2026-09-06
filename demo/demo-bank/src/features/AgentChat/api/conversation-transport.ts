@@ -2,6 +2,7 @@ import { parseConversationEvent } from './conversation-contract';
 import type { ConversationHttpClient } from './conversation-http-client';
 import type { ConversationStompClient, StompSubscription } from './conversation-stomp-client';
 import type { ConversationServerEvent, ConversationSnapshot } from '../model/conversation-types';
+import type { DemoAgentBridgeBinding } from '../model/overlay-types';
 
 export interface ConversationTransportCallbacks {
   onConnected: () => void;
@@ -13,7 +14,8 @@ export interface ConversationTransportCallbacks {
 }
 
 export interface ConversationTransport {
-  start(sessionId: string, pageIdentity?: string): void;
+  start(sessionId: string, bridgeBinding?: DemoAgentBridgeBinding): void;
+  updateBridgeBinding(bridgeBinding: DemoAgentBridgeBinding): void;
   refreshSnapshot(): Promise<ConversationSnapshot | null>;
   disconnect(): void;
 }
@@ -25,7 +27,7 @@ export function createConversationTransport(options: {
   callbacks: ConversationTransportCallbacks;
 }): ConversationTransport {
   let sessionId: string | null = null;
-  let pageIdentity: string | null = null;
+  let bridgeBinding: DemoAgentBridgeBinding | null = null;
   let subscription: StompSubscription | null = null;
   let snapshotAbort: AbortController | null = null;
   let syncing = false;
@@ -72,11 +74,11 @@ export function createConversationTransport(options: {
   };
 
   return {
-    start(nextSessionId, nextPageIdentity) {
+    start(nextSessionId, nextBridgeBinding) {
       subscription?.disconnect();
       snapshotAbort?.abort();
       sessionId = nextSessionId;
-      pageIdentity = nextPageIdentity ?? null;
+      bridgeBinding = nextBridgeBinding ?? null;
       subscription = options.stompClient.subscribe({
         webSocketUrl: options.webSocketUrl,
         destination: `/topic/sessions/${nextSessionId}/events`,
@@ -87,10 +89,14 @@ export function createConversationTransport(options: {
         onMessage(body) {
           let payload: unknown;
           try { payload = JSON.parse(body); } catch { options.callbacks.onSafeError(); return; }
-          const event = parseConversationEvent(payload, pageIdentity ? {
+          const event = parseConversationEvent(payload, bridgeBinding ? {
             sessionId: nextSessionId,
-            pageIdentity,
+            pageIdentity: bridgeBinding.pageIdentity,
             viewport: { width: window.innerWidth, height: window.innerHeight }
+          } : undefined, bridgeBinding ? {
+            sessionId: nextSessionId,
+            browserBindingId: bridgeBinding.browserBindingId,
+            pageIdentity: bridgeBinding.pageIdentity
           } : undefined);
           if (!event || event.sessionId !== nextSessionId) {
             options.callbacks.onSafeError();
@@ -108,6 +114,9 @@ export function createConversationTransport(options: {
         }
       });
     },
+    updateBridgeBinding(nextBridgeBinding) {
+      if (sessionId === nextBridgeBinding.sessionId) bridgeBinding = nextBridgeBinding;
+    },
     refreshSnapshot,
     disconnect() {
       subscription?.disconnect();
@@ -115,7 +124,7 @@ export function createConversationTransport(options: {
       snapshotAbort?.abort();
       snapshotAbort = null;
       sessionId = null;
-      pageIdentity = null;
+      bridgeBinding = null;
       syncing = false;
       bufferedEvents = [];
     }

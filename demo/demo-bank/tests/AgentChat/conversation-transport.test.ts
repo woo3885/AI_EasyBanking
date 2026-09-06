@@ -81,7 +81,11 @@ describe('conversation transport', () => {
         onConnected: vi.fn(), onReconnecting: vi.fn(), onSnapshot: vi.fn(), onEvent, onSafeError: vi.fn()
       }
     });
-    transport.start('session-1', 'page-1');
+    transport.start('session-1', {
+      sessionId: 'session-1', browserBindingId: 'binding-1', bridgeToken: 'token-1',
+      pageIdentity: 'page-1', expiresAt: '2099-01-01T00:00:00Z',
+      recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY'
+    });
     handlers.onMessage(JSON.stringify({ eventId: 'event-overlay', eventSequence: 3, eventType: 'OVERLAY_TARGET',
       sessionId: 'session-1', workflowStatus: 'USER_DECISION_REQUIRED', targetId: 'target-1',
       pageIdentity: 'page-1', sourceSnapshotId: 'snap-1', coordinateSpace: 'VIEWPORT_CSS_PX',

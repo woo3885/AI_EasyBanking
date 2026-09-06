@@ -11,7 +11,8 @@ describe('conversation runtime contract', () => {
   it('202 ACK envelope를 검증한다', () => {
     expect(parseAcceptedAck({ success: true, errorCode: null, message: null, data: {
       sessionId: 'session-1', requestId: 'request-1', messageId: 'message-1', acceptedSequence: 1,
-      queueStatus: 'ACTIVE', workflowStatus: 'SESSION_CREATED', acceptedAt: '2026-09-03T00:00:00Z', duplicate: false
+      queueStatus: 'ACTIVE', workflowStatus: 'SESSION_CREATED', acceptedAt: '2026-09-03T00:00:00Z', duplicate: false,
+      bridgeBinding: null
     } })).toMatchObject({ sessionId: 'session-1', acceptedSequence: 1 });
     expect(parseAcceptedAck({ success: true, data: { sessionId: 'session-1' } })).toBeNull();
   });

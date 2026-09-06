@@ -112,7 +112,9 @@ describe('AgentChat protected lifecycle integration', () => {
       <button type="button" data-testid="actual-target">이 상품 선택</button>
       <AgentChatShell httpClient={setup.httpClient} overlayHttpClient={setup.overlayHttpClient}
         stompClient={setup.stompClient}
-        bridgeBinding={{ sessionId: 'session-1', bridgeToken: 'token-1', pageIdentity: 'page-1' }} />
+        bridgeBinding={{ sessionId: 'session-1', browserBindingId: 'binding-1', bridgeToken: 'token-1',
+          pageIdentity: 'page-1', expiresAt: '2099-01-01T00:00:00Z',
+          recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY' }} />
     </div>);
     await waitFor(() => expect(setup.overlayHttpClient.recoverBridge).toHaveBeenCalledTimes(1));
     await act(async () => setup.handlers().onConnected());
@@ -141,7 +143,9 @@ describe('AgentChat protected lifecycle integration', () => {
     const setup = dependencies(vi.fn());
     render(<AgentChatShell httpClient={setup.httpClient} overlayHttpClient={setup.overlayHttpClient}
       stompClient={setup.stompClient}
-      bridgeBinding={{ sessionId: 'session-1', bridgeToken: 'token-1', pageIdentity: 'page-1' }} />);
+      bridgeBinding={{ sessionId: 'session-1', browserBindingId: 'binding-1', bridgeToken: 'token-1',
+        pageIdentity: 'page-1', expiresAt: '2099-01-01T00:00:00Z',
+        recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY' }} />);
     await waitFor(() => expect(setup.overlayHttpClient.recoverBridge).toHaveBeenCalledTimes(1));
     await act(async () => setup.handlers().onConnected());
     expect(await screen.findByTestId('dom-target-overlay')).toBeInTheDocument();
@@ -160,7 +164,9 @@ describe('AgentChat protected lifecycle integration', () => {
     const setup = dependencies(vi.fn());
     render(<AgentChatShell httpClient={setup.httpClient} overlayHttpClient={setup.overlayHttpClient}
       stompClient={setup.stompClient}
-      bridgeBinding={{ sessionId: 'session-1', bridgeToken: 'token-1', pageIdentity: 'page-1' }} />);
+      bridgeBinding={{ sessionId: 'session-1', browserBindingId: 'binding-1', bridgeToken: 'token-1',
+        pageIdentity: 'page-1', expiresAt: '2099-01-01T00:00:00Z',
+        recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY' }} />);
     await waitFor(() => expect(setup.overlayHttpClient.recoverBridge).toHaveBeenCalledTimes(1));
     await act(async () => setup.handlers().onConnected());
     expect(await screen.findByTestId('dom-target-overlay')).toBeInTheDocument();

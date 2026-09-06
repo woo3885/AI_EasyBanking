@@ -1,7 +1,8 @@
 import {
   parseAcceptedAck,
   parseConversationSnapshot,
-  type ConversationAcceptedAck
+  type ConversationAcceptedAck,
+  type InitialConversationAcceptedAck
 } from './conversation-contract';
 import type { ConversationSnapshot } from '../model/conversation-types';
 
@@ -27,7 +28,7 @@ export interface FollowUpConversationRequest {
 }
 
 export interface ConversationHttpClient {
-  createSession(request: InitialConversationRequest, signal: AbortSignal): Promise<ConversationAcceptedAck>;
+  createSession(request: InitialConversationRequest, signal: AbortSignal): Promise<InitialConversationAcceptedAck>;
   sendMessage(sessionId: string, request: FollowUpConversationRequest, signal: AbortSignal): Promise<ConversationAcceptedAck>;
   getSnapshot(sessionId: string, signal: AbortSignal): Promise<ConversationSnapshot>;
 }
@@ -61,7 +62,10 @@ export function createConversationHttpClient(
     async createSession(request, signal) {
       const ack = await post('/api/v1/sessions', request, signal);
       assertIdentity(ack, request.requestId, request.messageId);
-      return ack;
+      if (!ack.bridgeBinding || ack.bridgeBinding.sessionId !== ack.sessionId) {
+        throw new Error('INVALID_BRIDGE_BINDING');
+      }
+      return ack as InitialConversationAcceptedAck;
     },
     async sendMessage(sessionId, request, signal) {
       const ack = await post(`/api/v1/sessions/${encodeURIComponent(sessionId)}/messages`, request, signal);

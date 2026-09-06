@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createOverlayHttpClient } from '../../src/features/AgentChat/api/overlay-http-client';
 
-const binding = { sessionId: 'session-1', bridgeToken: 'bridge-secret', pageIdentity: 'page-1' };
+const binding = { sessionId: 'session-1', browserBindingId: 'binding-1', bridgeToken: 'bridge-secret',
+  pageIdentity: 'page-1', expiresAt: '2099-01-01T00:00:00Z',
+  recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY' as const };
 
 function response(data: unknown, status: number) {
   return new Response(JSON.stringify({ success: true, data, message: '접수', errorCode: null }), {
@@ -22,7 +24,8 @@ describe('Overlay HTTP client', () => {
     expect(fetcher).toHaveBeenCalledWith(
       'http://127.0.0.1:8080/api/v1/sessions/session-1/conversation/bridge',
       expect.objectContaining({ headers: expect.objectContaining({
-        'X-DDD-Bridge-Token': 'bridge-secret', 'X-DDD-Page-Identity': 'page-1'
+        'X-DDD-Bridge-Token': 'bridge-secret', 'X-DDD-Browser-Binding-Id': 'binding-1',
+        'X-DDD-Page-Identity': 'page-1'
       }) })
     );
   });
@@ -38,7 +41,8 @@ describe('Overlay HTTP client', () => {
     const options = fetcher.mock.calls[0][1] as RequestInit;
     expect(JSON.parse(String(options.body))).toEqual(request);
     expect(options.headers).toEqual(expect.objectContaining({
-      'X-DDD-Bridge-Token': 'bridge-secret', 'X-DDD-Page-Identity': 'page-1'
+      'X-DDD-Bridge-Token': 'bridge-secret', 'X-DDD-Browser-Binding-Id': 'binding-1',
+      'X-DDD-Page-Identity': 'page-1'
     }));
   });
 
@@ -50,6 +54,19 @@ describe('Overlay HTTP client', () => {
       requestId: 'request-1', targetId: 'target-1', sourceSnapshotId: 'snap-1',
       observationType: 'USER_CLICK', clientOccurredAt: '2026-09-06T12:00:00Z'
     }, new AbortController().signal)).rejects.toThrow('INVALID_OBSERVATION_ACK');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('foreign bridge recovery를 거절하고 자동 재시도하지 않는다', async () => {
+    const fetcher = vi.fn(async () => response({
+      sessionId: 'foreign', pageIdentity: 'page-1',
+      eventSubscription: '/topic/sessions/session-1/events',
+      conversationSnapshotPath: '/api/v1/sessions/session-1/conversation',
+      expiresAt: '2099-01-01T00:00:00Z', activeTarget: null
+    }, 200));
+    await expect(createOverlayHttpClient('http://127.0.0.1:8080', fetcher).recoverBridge(
+      binding, { width: 1280, height: 720 }, new AbortController().signal
+    )).rejects.toThrow('INVALID_BRIDGE_RECOVERY');
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });

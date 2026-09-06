@@ -50,7 +50,9 @@ describe('AgentChat Overlay bridge integration', () => {
     render(<StrictMode><div>
       <button type="button" data-testid="actual-product">이 상품 선택</button>
       <AgentChatShell httpClient={httpClient} overlayHttpClient={overlayHttpClient}
-        stompClient={stompClient} bridgeBinding={{ sessionId: 'session-1', bridgeToken: 'token-1', pageIdentity: 'page-1' }}
+        stompClient={stompClient} bridgeBinding={{ sessionId: 'session-1', browserBindingId: 'binding-1',
+          bridgeToken: 'token-1', pageIdentity: 'page-1', expiresAt: '2099-01-01T00:00:00Z',
+          recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY' }}
         createId={() => 'observation-request-1'} />
     </div></StrictMode>);
 

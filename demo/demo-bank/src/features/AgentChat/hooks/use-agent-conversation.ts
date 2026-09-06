@@ -4,6 +4,8 @@ import { createConversationHttpClient, DEFAULT_CONVERSATION_API_BASE_URL, type C
 import { createNativeConversationStompClient, toConversationWebSocketUrl, type ConversationStompClient } from '../api/conversation-stomp-client';
 import { createConversationTransport, type ConversationTransport } from '../api/conversation-transport';
 import { createOverlayHttpClient, type OverlayHttpClient } from '../api/overlay-http-client';
+import { createNavigationHttpClient, type NavigationHttpClient } from '../api/navigation-http-client';
+import { parseBrowserBridgeBinding } from '../api/navigation-contract';
 import { readDemoAgentBridge } from '../api/overlay-contract';
 import { conversationReducer } from '../model/conversation-reducer';
 import {
@@ -12,6 +14,11 @@ import {
 } from '../model/conversation-safety';
 import { createInitialConversationState, SAFE_CONNECTION_ERROR, SAFE_RESPONSE_ERROR, type ConversationAction, type ConversationMessage } from '../model/conversation-types';
 import type { DemoAgentBridgeBinding, PublicOverlayTarget } from '../model/overlay-types';
+import type { BrowserNavigationMode, PendingBrowserNavigation } from '../model/navigation-types';
+import {
+  navigateDemoBankSpa,
+  waitForDemoBankRouteReady
+} from '../../../navigation/demo-bank-spa';
 
 export interface AgentChatSubmitRequest { requestId: string; message: ConversationMessage }
 
@@ -22,8 +29,14 @@ export interface AgentConversationDependencies {
   createId?: (prefix: string) => string;
   onSubmitRequest?: (request: AgentChatSubmitRequest) => void | Promise<void>;
   overlayHttpClient?: OverlayHttpClient;
+  navigationHttpClient?: NavigationHttpClient;
   bridgeBinding?: DemoAgentBridgeBinding | null;
   pageProtection?: AgentPageProtection;
+  navigate?: (route: PendingBrowserNavigation['destinationRoute'], mode: BrowserNavigationMode) => void;
+  waitForRouteReady?: (
+    route: PendingBrowserNavigation['destinationRoute'],
+    signal: AbortSignal
+  ) => Promise<void>;
 }
 
 function defaultId(prefix: string) {
@@ -47,20 +60,29 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
   const requestAbort = useRef<AbortController | null>(null);
   const bootstrapAbort = useRef<AbortController | null>(null);
   const observationAbort = useRef<AbortController | null>(null);
+  const navigationAbort = useRef<AbortController | null>(null);
   const bridgeRef = useRef<DemoAgentBridgeBinding | null>(null);
   const pageProtectionRef = useRef<AgentPageProtection>('NONE');
   const bridgeRecoveryGeneration = useRef(0);
   const reconnectRecoveryPending = useRef(false);
   const pendingInitialBridgeTarget = useRef<PublicOverlayTarget | null>(null);
   const transportRef = useRef<ConversationTransport | null>(null);
+  const handledNavigationIds = useRef(new Set<string>());
+  const navigationGeneration = useRef(0);
   const baseUrl = dependencies.backendBaseUrl ?? import.meta.env.VITE_BACKEND_BASE_URL ?? DEFAULT_CONVERSATION_API_BASE_URL;
   const httpClient = useMemo(() => dependencies.httpClient ?? createConversationHttpClient(baseUrl), [baseUrl, dependencies.httpClient]);
   const overlayHttpClient = useMemo(
     () => dependencies.overlayHttpClient ?? createOverlayHttpClient(baseUrl),
     [baseUrl, dependencies.overlayHttpClient]
   );
+  const navigationHttpClient = useMemo(
+    () => dependencies.navigationHttpClient ?? createNavigationHttpClient(baseUrl),
+    [baseUrl, dependencies.navigationHttpClient]
+  );
   const stompClient = useMemo(() => dependencies.stompClient ?? createNativeConversationStompClient(), [dependencies.stompClient]);
   const createId = dependencies.createId ?? defaultId;
+  const navigate = dependencies.navigate ?? navigateDemoBankSpa;
+  const waitForRouteReady = dependencies.waitForRouteReady ?? waitForDemoBankRouteReady;
   const pageProtection = dependencies.pageProtection ?? 'NONE';
   pageProtectionRef.current = pageProtection;
   const protection = getConversationProtectionPolicy(state, pageProtection);
@@ -71,6 +93,9 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
   }, []);
 
   const recoverBridge = useCallback(async (binding: DemoAgentBridgeBinding) => {
+    if (!parseBrowserBridgeBinding(binding, binding.sessionId)) {
+      throw new Error('INVALID_BRIDGE_BINDING');
+    }
     const generation = bridgeRecoveryGeneration.current + 1;
     bridgeRecoveryGeneration.current = generation;
     bootstrapAbort.current?.abort();
@@ -111,7 +136,72 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
     }
   }, [apply, recoverBridge]);
 
-  const startTransport = useCallback((sessionId: string, pageIdentity?: string) => {
+  const runNavigation = useCallback(async (navigation: PendingBrowserNavigation) => {
+    const current = stateRef.current;
+    const binding = bridgeRef.current;
+    if (!binding || handledNavigationIds.current.has(navigation.navigationId) ||
+        !getConversationProtectionPolicy(current, pageProtectionRef.current).canSubmitMessage ||
+        current.sessionId !== binding.sessionId ||
+        current.pageIdentity !== navigation.sourcePageIdentity ||
+        binding.browserBindingId !== navigation.browserBindingId ||
+        binding.pageIdentity !== navigation.sourcePageIdentity ||
+        Date.parse(binding.expiresAt) <= Date.now() ||
+        Date.parse(navigation.expiresAt) <= Date.now()) return;
+
+    handledNavigationIds.current.add(navigation.navigationId);
+    const generation = navigationGeneration.current + 1;
+    navigationGeneration.current = generation;
+    navigationAbort.current?.abort();
+    const controller = new AbortController();
+    navigationAbort.current = controller;
+    apply({ type: 'OVERLAY_CLEARED_LOCAL' });
+
+    try {
+      navigate(navigation.destinationRoute, navigation.navigationMode);
+      await waitForRouteReady(navigation.destinationRoute, controller.signal);
+      const latest = stateRef.current;
+      const latestBinding = bridgeRef.current;
+      if (controller.signal.aborted || generation !== navigationGeneration.current ||
+          latest.pendingNavigation?.navigationId !== navigation.navigationId ||
+          !latestBinding || latestBinding.sessionId !== binding.sessionId ||
+          latestBinding.browserBindingId !== binding.browserBindingId ||
+          latestBinding.pageIdentity !== navigation.sourcePageIdentity) return;
+
+      const request = {
+        requestId: createId('page-ready-request'),
+        navigationId: navigation.navigationId,
+        sourcePageIdentity: navigation.sourcePageIdentity,
+        destinationPageIdentity: navigation.destinationPageIdentity,
+        routeRevision: navigation.routeRevision,
+        renderedRoute: navigation.destinationRoute,
+        viewportWidth: Math.max(1, Math.round(window.innerWidth)),
+        viewportHeight: Math.max(1, Math.round(window.innerHeight)),
+        devicePixelRatio: Math.min(10, Math.max(0.1, window.devicePixelRatio || 1))
+      };
+      const acknowledged = await navigationHttpClient.pageReady(latestBinding, request, controller.signal);
+      if (controller.signal.aborted || generation !== navigationGeneration.current ||
+          stateRef.current.pendingNavigation?.navigationId !== navigation.navigationId) return;
+      const rotatedBinding: DemoAgentBridgeBinding = {
+        ...latestBinding,
+        pageIdentity: acknowledged.pageIdentity
+      };
+      bridgeRef.current = rotatedBinding;
+      transportRef.current?.updateBridgeBinding(rotatedBinding);
+      apply({
+        type: 'PAGE_READY_ACKNOWLEDGED',
+        navigationId: acknowledged.navigationId,
+        pageIdentity: acknowledged.pageIdentity
+      });
+    } catch {
+      if (!controller.signal.aborted && generation === navigationGeneration.current) {
+        apply({ type: 'SAFE_ERROR_SET', error: SAFE_CONNECTION_ERROR });
+      }
+    } finally {
+      if (navigationAbort.current === controller) navigationAbort.current = null;
+    }
+  }, [apply, createId, navigate, navigationHttpClient, waitForRouteReady]);
+
+  const startTransport = useCallback((sessionId: string, bridgeBinding?: DemoAgentBridgeBinding) => {
     stopTransport();
     apply({ type: 'CONNECTION_CHANGED', connectionPhase: 'CONNECTING' });
     const transport = createConversationTransport({
@@ -153,6 +243,19 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
         onEvent: (event) => {
           const before = stateRef.current;
           apply({ type: 'SERVER_EVENT_RECEIVED', event });
+          if (event.eventType === 'NAVIGATION_REQUIRED' &&
+              event.eventSequence > before.lastEventSequence &&
+              !before.seenEventIds.includes(event.eventId) &&
+              getConversationProtectionPolicy(before, pageProtectionRef.current).canSubmitMessage) {
+            void runNavigation(event);
+          }
+          if ((event.eventType === 'NAVIGATION_CLEAR' ||
+              event.eventType === 'PAGE_READY_RESUME_FAILED') &&
+              before.pendingNavigation?.navigationId === event.navigationId) {
+            navigationGeneration.current += 1;
+            navigationAbort.current?.abort();
+            navigationAbort.current = null;
+          }
           if (event.eventType === 'AI_MESSAGE' && before.activeQuestion && event.goalRevision > before.goalRevision) {
             void transportRef.current?.refreshSnapshot();
           }
@@ -161,13 +264,16 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
       }
     });
     transportRef.current = transport;
-    transport.start(sessionId, pageIdentity);
-  }, [apply, baseUrl, httpClient, restoreBridgeTarget, stompClient, stopTransport]);
+    transport.start(sessionId, bridgeBinding);
+  }, [apply, baseUrl, httpClient, restoreBridgeTarget, runNavigation, stompClient, stopTransport]);
 
   useEffect(() => {
-    const injected = dependencies.bridgeBinding === undefined
+    const injectedValue = dependencies.bridgeBinding === undefined
       ? readDemoAgentBridge((window as Window & { __DDD_AGENT_BRIDGE__?: unknown }).__DDD_AGENT_BRIDGE__)
       : dependencies.bridgeBinding;
+    const injected = injectedValue
+      ? parseBrowserBridgeBinding(injectedValue, injectedValue.sessionId)
+      : null;
     if (!injected) return;
     let timer = window.setTimeout(() => {
       timer = 0;
@@ -176,12 +282,12 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
         bridgeRef.current = injected;
         apply({ type: 'SESSION_ASSIGNED', sessionId: recovery.sessionId });
         pendingInitialBridgeTarget.current = recovery.activeTarget;
-        startTransport(recovery.sessionId, recovery.pageIdentity);
         apply({
           type: 'BRIDGE_RECOVERED',
           pageIdentity: recovery.pageIdentity,
           activeTarget: null
         });
+        startTransport(recovery.sessionId, injected);
       }).catch(() => {
         apply({ type: 'CONNECTION_CHANGED', connectionPhase: 'ERROR' });
         apply({ type: 'SAFE_ERROR_SET', error: SAFE_CONNECTION_ERROR });
@@ -220,21 +326,30 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
     requestAbort.current = controller;
     try {
       const current = stateRef.current;
-      const ack = current.sessionId
-        ? await httpClient.sendMessage(current.sessionId, {
+      let ack;
+      if (current.sessionId) {
+        ack = await httpClient.sendMessage(current.sessionId, {
             requestId, messageId, content,
             answerToQuestionId: current.activeQuestion?.questionId ?? null,
             expectedConversationSequence: current.conversationSequence,
             expectedGoalRevision: current.goalRevision,
             clientOccurredAt: message.occurredAt
-          }, controller.signal)
-        : await httpClient.createSession({
+          }, controller.signal);
+      } else {
+        const initialAck = await httpClient.createSession({
             requestId, messageId, content, siteId: 'demo-bank',
             initialPath: safeInitialPath(), clientOccurredAt: message.occurredAt
           }, controller.signal);
-      if (!current.sessionId) {
-        apply({ type: 'SESSION_ASSIGNED', sessionId: ack.sessionId });
-        startTransport(ack.sessionId);
+        ack = initialAck;
+        bridgeRef.current = initialAck.bridgeBinding;
+        apply({ type: 'SESSION_ASSIGNED', sessionId: initialAck.sessionId });
+        apply({
+          type: 'BRIDGE_RECOVERED',
+          pageIdentity: initialAck.bridgeBinding.pageIdentity,
+          activeTarget: null
+        });
+        startTransport(initialAck.sessionId, initialAck.bridgeBinding);
+        void restoreBridgeTarget();
       }
       apply({ type: 'MESSAGE_ACKNOWLEDGED', requestId, messageId, acceptedSequence: ack.acceptedSequence });
     } catch {
@@ -243,7 +358,7 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
       if (requestAbort.current === controller) requestAbort.current = null;
       submitLock.current = false;
     }
-  }, [apply, createId, dependencies, httpClient, pageProtection, startTransport]);
+  }, [apply, createId, dependencies, httpClient, pageProtection, restoreBridgeTarget, startTransport]);
 
   const clearOverlay = useCallback(() => {
     apply({ type: 'OVERLAY_CLEARED_LOCAL' });
@@ -294,7 +409,13 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
     const current = stateRef.current;
     if (current.sessionId && getConversationProtectionPolicy(current, pageProtection).canReconnect) {
       reconnectRecoveryPending.current = true;
-      startTransport(current.sessionId, current.pageIdentity ?? undefined);
+      const binding = bridgeRef.current;
+      if (!binding || binding.sessionId !== current.sessionId ||
+          binding.pageIdentity !== current.pageIdentity || Date.parse(binding.expiresAt) <= Date.now()) {
+        apply({ type: 'SAFE_ERROR_SET', error: SAFE_CONNECTION_ERROR });
+        return;
+      }
+      startTransport(current.sessionId, binding);
     }
     else apply({ type: 'SAFE_ERROR_SET', error: SAFE_CONNECTION_ERROR });
   }, [apply, pageProtection, startTransport]);
@@ -312,6 +433,9 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
     submitLock.current = false;
     observationAbort.current?.abort();
     observationAbort.current = null;
+    navigationGeneration.current += 1;
+    navigationAbort.current?.abort();
+    navigationAbort.current = null;
     apply({ type: 'PROTECTION_ENFORCED', clearDraft: protection.shouldClearDraft });
     if (protection.shouldStopTransport) stopTransport();
   }, [
@@ -334,9 +458,12 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
     requestAbort.current?.abort();
     bootstrapAbort.current?.abort();
     observationAbort.current?.abort();
+    navigationAbort.current?.abort();
     bridgeRecoveryGeneration.current += 1;
+    navigationGeneration.current += 1;
     reconnectRecoveryPending.current = false;
     bridgeRef.current = null;
+    handledNavigationIds.current.clear();
     stopTransport();
   }, [stopTransport]);
 
