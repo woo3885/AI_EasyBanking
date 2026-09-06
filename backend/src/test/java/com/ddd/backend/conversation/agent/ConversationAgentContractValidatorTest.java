@@ -5,6 +5,8 @@ import com.ddd.backend.conversation.goal.UserGoalAuthority;
 import com.ddd.backend.conversation.goal.UserGoalPatch;
 import com.ddd.backend.conversation.navigation.BrowserNavigationMode;
 import com.ddd.backend.conversation.navigation.BrowserSemanticRoute;
+import com.ddd.backend.conversation.navigation.PageReadyResumeError;
+import com.ddd.backend.conversation.overlay.GuideUserMaterializationException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -45,8 +47,8 @@ class ConversationAgentContractValidatorTest {
                 new ConversationAgentDecision.ActionCandidate("CLICK"));
 
         assertThatThrownBy(() -> validator.validate(request, decision))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("sourceSnapshotId");
+                .isInstanceOfSatisfying(GuideUserMaterializationException.class,
+                        error -> assertThat(error.error()).isEqualTo(PageReadyResumeError.GUIDE_USER_TARGET_INVALID));
     }
 
     @Test
@@ -71,8 +73,17 @@ class ConversationAgentContractValidatorTest {
                 "snap-1", null, null,
                 new ConversationAgentDecision.ActionCandidate("WAIT_FOR_USER"));
         assertThatThrownBy(() -> validator.validate(request, missingTarget))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("semantic target");
+                .isInstanceOfSatisfying(GuideUserMaterializationException.class,
+                        error -> assertThat(error.error()).isEqualTo(PageReadyResumeError.GUIDE_USER_TARGET_INVALID));
+
+        var missingCandidate = new ConversationAgentDecision(
+                "req-1", "msg-1", request.goal().goalId(), 0,
+                ConversationInteractionMode.GUIDE_USER,
+                "버튼을 직접 눌러주세요.", 0.8, "USER_ACTION_REQUIRED", "DOM_CHANGE",
+                "snap-1", null, null, null);
+        assertThatThrownBy(() -> validator.validate(request, missingCandidate))
+                .isInstanceOfSatisfying(GuideUserMaterializationException.class,
+                        error -> assertThat(error.error()).isEqualTo(PageReadyResumeError.GUIDE_USER_TARGET_MISSING));
     }
 
     @Test

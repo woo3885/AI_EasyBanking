@@ -10,6 +10,8 @@ import com.ddd.backend.domain.session.AutomationSessionRepository;
 import com.ddd.backend.domain.session.WorkflowStatus;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -20,14 +22,12 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import jakarta.annotation.PreDestroy;
-import com.ddd.backend.automation.dom.ElementResolutionException;
-import com.ddd.backend.conversation.overlay.OverlayTargetException;
-import com.ddd.backend.conversation.overlay.OverlayTargetError;
 
 import static com.ddd.backend.conversation.navigation.BrowserNavigationError.*;
 
 @Service
 public final class BrowserNavigationService {
+    private static final Logger log = LoggerFactory.getLogger(BrowserNavigationService.class);
     private static final Duration TTL = Duration.ofMinutes(2);
     private static final Set<WorkflowStatus> BLOCKED = Set.of(
             WorkflowStatus.SECURE_INPUT_REQUIRED, WorkflowStatus.RISK_WARNING,
@@ -108,32 +108,25 @@ public final class BrowserNavigationService {
             events.pageReadyObserved(navigation, Instant.now());
             port.resumeOnce(navigation);
         } catch (RuntimeException exception) {
-            events.pageReadyResumeFailed(navigation, classifyResumeError(exception), Instant.now());
+            PageReadyResumeError error = PageReadyResumeErrors.classify(exception);
+            try {
+                events.pageReadyResumeFailed(navigation, error, Instant.now());
+            } catch (RuntimeException publishFailure) {
+                log.error("Page-ready failure event publish failed. sessionRef={} navigationRef={} domainError={}",
+                        safeRef(navigation.sessionId()), safeRef(navigation.navigationId()),
+                        PageReadyResumeError.OVERLAY_EVENT_PUBLISH_FAILED.name());
+            }
         }
     }
-    private PageReadyResumeError classifyResumeError(Throwable error) {
-        for (Throwable current = error; current != null; current = current.getCause()) {
-            if (current instanceof PageReadyResumeException resume) return resume.error();
-            if (current instanceof ElementResolutionException resolution) {
-                return switch (resolution.error()) {
-                    case TARGET_NOT_FOUND -> PageReadyResumeError.OVERLAY_TARGET_NOT_FOUND;
-                    case TARGET_AMBIGUOUS -> PageReadyResumeError.OVERLAY_TARGET_AMBIGUOUS;
-                    case STALE_SNAPSHOT -> PageReadyResumeError.OVERLAY_TARGET_STALE_SNAPSHOT;
-                    case POLICY_MISMATCH -> PageReadyResumeError.OVERLAY_TARGET_POLICY_MISMATCH;
-                };
-            }
-            if (current instanceof OverlayTargetException target) {
-                if (target.error() == OverlayTargetError.TARGET_NOT_FOUND) {
-                    return PageReadyResumeError.OVERLAY_TARGET_NOT_FOUND;
-                }
-                if (target.error() == OverlayTargetError.TARGET_STALE_SNAPSHOT
-                        || target.error() == OverlayTargetError.TARGET_STALE_PAGE) {
-                    return PageReadyResumeError.OVERLAY_TARGET_STALE_SNAPSHOT;
-                }
-                return PageReadyResumeError.OVERLAY_TARGET_POLICY_MISMATCH;
-            }
+    private String safeRef(String value) {
+        if (value == null) return "none";
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(digest, 0, 6);
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            return "unavailable";
         }
-        return PageReadyResumeError.PAGE_READY_RESUME_FAILED;
     }
     @PreDestroy
     void closeResumeExecutor() {

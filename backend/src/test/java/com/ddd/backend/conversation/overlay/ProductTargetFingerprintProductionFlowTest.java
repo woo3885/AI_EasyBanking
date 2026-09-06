@@ -38,6 +38,7 @@ class ProductTargetFingerprintProductionFlowTest {
                         <article><h2>12개월 정기예금</h2>
                           <button onclick="document.body.dataset.selected='basic'">이 상품 선택</button>
                         </article>
+                        <div style="height: 900px"></div>
                         <article><h2>우대금리 정기예금</h2>
                           <button onclick="document.body.dataset.selected='preferred'">이 상품 선택</button>
                         </article>
@@ -112,6 +113,7 @@ class ProductTargetFingerprintProductionFlowTest {
             assertThat(target.pageIdentity()).isEqualTo("destination-page");
             assertThat(target.sourceSnapshotId()).isEqualTo(result.snapshot().snapshotId());
             assertThat(target.label()).isEqualTo("우대금리 정기예금");
+            assertThat(target.rectangle().y()).isBetween(0.0, target.viewport().height());
         }
     }
 }

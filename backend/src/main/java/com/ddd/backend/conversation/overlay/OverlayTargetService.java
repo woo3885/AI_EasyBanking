@@ -14,6 +14,8 @@ import com.ddd.backend.conversation.event.ConversationEventPublisher;
 import com.microsoft.playwright.Locator;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -23,9 +25,11 @@ import java.util.Set;
 import java.util.UUID;
 
 import static com.ddd.backend.conversation.overlay.OverlayTargetError.TARGET_NOT_INTERACTABLE;
+import com.ddd.backend.conversation.navigation.PageReadyResumeError;
 
 @Service
 public final class OverlayTargetService {
+    private static final Logger log = LoggerFactory.getLogger(OverlayTargetService.class);
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
     private static final Set<String> ALLOWED_ROLES = Set.of("button", "link", "radio", "checkbox", "option");
     private final BrowserSessionManager browsers;
@@ -93,6 +97,8 @@ public final class OverlayTargetService {
         Geometry geometry = browsers.execute(sessionId, TIMEOUT, page -> {
             Locator locator = elements.resolveLocator(page, sessionId, internalElementId);
             if (!locator.isVisible() || !locator.isEnabled()) throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
+            locator.scrollIntoViewIfNeeded();
+            if (!locator.isVisible() || !locator.isEnabled()) throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
             Object raw = locator.evaluate("element => { const r=element.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height,viewportWidth:window.innerWidth,viewportHeight:window.innerHeight,topLevel:window===window.top}; }");
             Map<?, ?> values = (Map<?, ?>) raw;
             if (!Boolean.TRUE.equals(values.get("topLevel"))) throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
@@ -107,10 +113,24 @@ public final class OverlayTargetService {
                 new PublicOverlayTarget.Viewport(geometry.viewportWidth, geometry.viewportHeight),
                 role, label, safeGuide, OverlayActionMode.GUIDE_USER_CLICK,
                 now, targets.expiresAt(), null);
-        PublicOverlayTarget saved = targets.replace(
-                target, internalElementId, DomSnapshotFingerprint.of(snapshot));
-        events.overlayTarget(saved, now);
-        return saved;
+        PublicOverlayTarget saved;
+        try {
+            saved = targets.replace(target, internalElementId, DomSnapshotFingerprint.of(snapshot));
+        } catch (RuntimeException exception) {
+            log.error("Overlay target materialization failed. errorCode={} causeType={} reason={}",
+                    PageReadyResumeError.OVERLAY_TARGET_MATERIALIZATION_FAILED,
+                    exception.getClass().getSimpleName(), exception.getMessage());
+            throw new GuideUserMaterializationException(
+                    PageReadyResumeError.OVERLAY_TARGET_MATERIALIZATION_FAILED, exception);
+        }
+        try {
+            events.overlayTarget(saved, now);
+            return saved;
+        } catch (RuntimeException exception) {
+            targets.removeSession(sessionId);
+            throw new GuideUserMaterializationException(
+                    PageReadyResumeError.OVERLAY_EVENT_PUBLISH_FAILED, exception);
+        }
     }
 
     public PublicOverlayTarget create(String sessionId, SanitizedDomSnapshot snapshot,

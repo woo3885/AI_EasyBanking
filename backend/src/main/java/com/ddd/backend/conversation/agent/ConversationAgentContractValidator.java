@@ -1,5 +1,7 @@
 package com.ddd.backend.conversation.agent;
 import com.ddd.backend.conversation.ConversationMessagePolicy;
+import com.ddd.backend.conversation.navigation.PageReadyResumeError;
+import com.ddd.backend.conversation.overlay.GuideUserMaterializationException;
 import org.springframework.stereotype.Component;
 import java.util.*;
 
@@ -28,7 +30,12 @@ public final class ConversationAgentContractValidator {
         }
         if (SNAPSHOT_REQUIRED.contains(decision.mode())) {
             String expected = request.snapshot() == null ? null : request.snapshot().sourceSnapshotId();
-            if (expected == null || !expected.equals(decision.sourceSnapshotId())) throw new IllegalArgumentException("Invalid sourceSnapshotId");
+            if (expected == null || !expected.equals(decision.sourceSnapshotId())) {
+                if (decision.mode() == ConversationInteractionMode.GUIDE_USER) {
+                    throw new GuideUserMaterializationException(PageReadyResumeError.GUIDE_USER_TARGET_INVALID);
+                }
+                throw new IllegalArgumentException("Invalid sourceSnapshotId");
+            }
         }
         if (decision.goalPatch() != null
                 && decision.goalPatch().basedOnRevision() != decision.baseGoalRevision())
@@ -50,14 +57,17 @@ public final class ConversationAgentContractValidator {
             throw new IllegalArgumentException("Action candidate requires snapshot");
         if (decision.mode() == ConversationInteractionMode.GUIDE_USER) {
             var candidate = decision.actionCandidate();
-            if (candidate == null || !"WAIT_FOR_USER".equals(candidate.actionType())
+            if (candidate == null) {
+                throw new GuideUserMaterializationException(PageReadyResumeError.GUIDE_USER_TARGET_MISSING);
+            }
+            if (!"WAIT_FOR_USER".equals(candidate.actionType())
                     || blank(candidate.targetElementId()) || blank(candidate.role())
                     || blank(candidate.accessibleLabel()) || blank(candidate.guide())
                     || candidate.targetElementId().length() > 128
                     || candidate.role().length() > 32
                     || candidate.accessibleLabel().length() > 120
                     || candidate.guide().length() > 200) {
-                throw new IllegalArgumentException("GUIDE_USER requires a sanitized semantic target");
+                throw new GuideUserMaterializationException(PageReadyResumeError.GUIDE_USER_TARGET_INVALID);
             }
         }
         if (decision.mode() == ConversationInteractionMode.NAVIGATION_REQUIRED) {
