@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  base: process.env.GITHUB_PAGES_BASE ?? '/',
   plugins: [react()],
 
   resolve: {
