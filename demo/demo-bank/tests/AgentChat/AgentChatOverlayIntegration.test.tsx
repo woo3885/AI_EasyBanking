@@ -54,9 +54,10 @@ describe('AgentChat Overlay bridge integration', () => {
         createId={() => 'observation-request-1'} />
     </div></StrictMode>);
 
+    await waitFor(() => expect(overlayHttpClient.recoverBridge).toHaveBeenCalledTimes(1));
+    await act(async () => handlers.onConnected());
     expect(await screen.findByTestId('dom-target-overlay')).toBeInTheDocument();
     expect(overlayHttpClient.recoverBridge).toHaveBeenCalledTimes(1);
-    await act(async () => handlers.onConnected());
     expect(await screen.findByText('상품을 직접 선택해 주세요.')).toBeInTheDocument();
     const button = screen.getByTestId('actual-product');
     button.getBoundingClientRect = () => ({ x: 100, y: 200, left: 100, top: 200,

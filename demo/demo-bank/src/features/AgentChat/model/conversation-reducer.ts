@@ -10,6 +10,10 @@ import {
   type ConversationState
 } from './conversation-types';
 import { overlayTargetFromEvent } from '../api/overlay-contract';
+import {
+  isProtectedWorkflowStatus,
+  shouldClearDraftForStatus
+} from './conversation-safety';
 
 const MAX_SEEN_EVENT_IDS = 200;
 
@@ -78,6 +82,10 @@ function applyServerEvent(state: ConversationState, event: ConversationServerEve
 
   if (event.eventType === 'OVERLAY_TARGET') {
     if (state.pageIdentity !== event.pageIdentity) return state;
+    if (isProtectedWorkflowStatus(state.workflowStatus) ||
+        isProtectedWorkflowStatus(event.workflowStatus)) {
+      return { ...state, ...common };
+    }
     return {
       ...state,
       ...common,
@@ -95,7 +103,9 @@ function applyServerEvent(state: ConversationState, event: ConversationServerEve
     return {
       ...state,
       ...common,
-      activeTarget: matches ? null : state.activeTarget
+      activeTarget: matches ? null : state.activeTarget,
+      observationPhase: matches ? 'IDLE' : state.observationPhase,
+      pendingObservation: matches ? null : state.pendingObservation
     };
   }
 
@@ -115,6 +125,7 @@ function applyServerEvent(state: ConversationState, event: ConversationServerEve
   }
 
   if (event.eventType === 'USER_MESSAGE_ACCEPTED') {
+    const protectedState = isProtectedWorkflowStatus(event.workflowStatus);
     return {
       ...state,
       ...common,
@@ -125,7 +136,13 @@ function applyServerEvent(state: ConversationState, event: ConversationServerEve
           : message
       ),
       conversationSequence: Math.max(state.conversationSequence, event.acceptedSequence),
-      submitPhase: 'WAITING_FOR_AI'
+      draft: shouldClearDraftForStatus(event.workflowStatus) ? '' : state.draft,
+      activeTarget: protectedState ? null : state.activeTarget,
+      observationPhase: protectedState ? 'IDLE' : state.observationPhase,
+      pendingObservation: protectedState ? null : state.pendingObservation,
+      submitPhase: protectedState ? 'IDLE' : 'WAITING_FOR_AI',
+      pendingRequestId: protectedState ? null : state.pendingRequestId,
+      pendingMessageId: protectedState ? null : state.pendingMessageId
     };
   }
 
@@ -141,24 +158,20 @@ function applyServerEvent(state: ConversationState, event: ConversationServerEve
     conversationSequence: Math.max(state.conversationSequence, event.sequence),
     goalRevision: Math.max(state.goalRevision, event.goalRevision),
     activeQuestion: event.eventType === 'AI_QUESTION' ? toActiveQuestion(event) : state.activeQuestion,
-    activeTarget: isOverlayBlockedStatus(event.workflowStatus) ? null : state.activeTarget,
-    observationPhase: isOverlayBlockedStatus(event.workflowStatus) ? 'IDLE' : state.observationPhase,
-    pendingObservation: isOverlayBlockedStatus(event.workflowStatus) ? null : state.pendingObservation,
+    draft: shouldClearDraftForStatus(event.workflowStatus) ? '' : state.draft,
+    activeTarget: isProtectedWorkflowStatus(event.workflowStatus) ? null : state.activeTarget,
+    observationPhase: isProtectedWorkflowStatus(event.workflowStatus) ? 'IDLE' : state.observationPhase,
+    pendingObservation: isProtectedWorkflowStatus(event.workflowStatus) ? null : state.pendingObservation,
     submitPhase: 'IDLE',
     pendingRequestId: null,
     pendingMessageId: null
   };
 }
 
-function isOverlayBlockedStatus(status: ConversationState['workflowStatus']) {
-  return status === 'SECURE_INPUT_REQUIRED' || status === 'RISK_WARNING' ||
-    status === 'FINAL_CONFIRMATION_REQUIRED' || status === 'COMPLETED' ||
-    status === 'CANCELLED' || status === 'ERROR' || status === 'TERMINATED';
-}
-
 export function conversationReducer(state: ConversationState, action: ConversationAction): ConversationState {
   switch (action.type) {
     case 'DRAFT_CHANGED':
+      if (isProtectedWorkflowStatus(state.workflowStatus)) return state;
       return {
         ...state,
         draft: action.draft,
@@ -170,6 +183,8 @@ export function conversationReducer(state: ConversationState, action: Conversati
         ? { ...createInitialConversationState(state.connectionPhase), sessionId: action.sessionId }
         : { ...state, sessionId: action.sessionId };
     case 'MESSAGE_SUBMIT_STARTED': {
+      if (isProtectedWorkflowStatus(state.workflowStatus) ||
+          (state.sessionId !== null && state.connectionPhase !== 'CONNECTED')) return state;
       const validation = validateChatMessage(action.message.text, {
         isSubmissionPending: isConversationSubmissionPending(state.submitPhase)
       });
@@ -242,13 +257,18 @@ export function conversationReducer(state: ConversationState, action: Conversati
         conversationSequence: snapshot.conversationSequence,
         goalRevision: snapshot.goalRevision,
         activeQuestion: snapshot.activeQuestion,
-        activeTarget: isOverlayBlockedStatus(snapshot.workflowStatus) ? null : state.activeTarget,
-        observationPhase: isOverlayBlockedStatus(snapshot.workflowStatus) ? 'IDLE' : state.observationPhase,
-        pendingObservation: isOverlayBlockedStatus(snapshot.workflowStatus) ? null : state.pendingObservation,
+        draft: shouldClearDraftForStatus(snapshot.workflowStatus) ? '' : state.draft,
+        activeTarget: isProtectedWorkflowStatus(snapshot.workflowStatus) ? null : state.activeTarget,
+        observationPhase: isProtectedWorkflowStatus(snapshot.workflowStatus) ? 'IDLE' : state.observationPhase,
+        pendingObservation: isProtectedWorkflowStatus(snapshot.workflowStatus) ? null : state.pendingObservation,
         workflowStatus: snapshot.workflowStatus,
-        submitPhase: snapshot.activeQuestion || snapshot.recentSafeMessages.some((message) => message.role === 'AI')
+        submitPhase: isProtectedWorkflowStatus(snapshot.workflowStatus)
+          ? 'IDLE'
+          : snapshot.activeQuestion || snapshot.recentSafeMessages.some((message) => message.role === 'AI')
           ? 'IDLE'
           : state.submitPhase,
+        pendingRequestId: isProtectedWorkflowStatus(snapshot.workflowStatus) ? null : state.pendingRequestId,
+        pendingMessageId: isProtectedWorkflowStatus(snapshot.workflowStatus) ? null : state.pendingMessageId,
         safeError: null
       };
     }
@@ -256,7 +276,7 @@ export function conversationReducer(state: ConversationState, action: Conversati
       return {
         ...state,
         pageIdentity: action.pageIdentity,
-        activeTarget: action.activeTarget,
+        activeTarget: isProtectedWorkflowStatus(state.workflowStatus) ? null : action.activeTarget,
         observationPhase: 'IDLE',
         pendingObservation: null
       };
@@ -268,7 +288,8 @@ export function conversationReducer(state: ConversationState, action: Conversati
         pendingObservation: null
       };
     case 'OBSERVATION_STARTED':
-      if (!state.activeTarget || state.observationPhase !== 'IDLE' ||
+      if (isProtectedWorkflowStatus(state.workflowStatus) || state.connectionPhase !== 'CONNECTED' ||
+          !state.activeTarget || state.observationPhase !== 'IDLE' ||
           state.activeTarget.targetId !== action.observation.targetId ||
           state.activeTarget.pageIdentity !== action.observation.pageIdentity ||
           state.activeTarget.sourceSnapshotId !== action.observation.sourceSnapshotId) return state;
@@ -282,12 +303,30 @@ export function conversationReducer(state: ConversationState, action: Conversati
       return state.pendingObservation?.requestId === action.requestId
         ? { ...state, observationPhase: 'ERROR', pendingObservation: null }
         : state;
+    case 'PROTECTION_ENFORCED':
+      if (!state.activeTarget && !state.pendingObservation &&
+          state.observationPhase === 'IDLE' && !state.pendingRequestId &&
+          !state.pendingMessageId && state.submitPhase === 'IDLE' &&
+          (!action.clearDraft || !state.draft)) return state;
+      return {
+        ...state,
+        draft: action.clearDraft ? '' : state.draft,
+        submitPhase: 'IDLE',
+        pendingRequestId: null,
+        pendingMessageId: null,
+        activeTarget: null,
+        observationPhase: 'IDLE',
+        pendingObservation: null
+      };
     case 'CONNECTION_CHANGED':
-      return action.connectionPhase === 'CONNECTED'
+      return action.connectionPhase === 'CONNECTED' || action.connectionPhase === 'CONNECTING'
         ? { ...state, connectionPhase: action.connectionPhase }
         : {
             ...state,
             connectionPhase: action.connectionPhase,
+            submitPhase: 'IDLE',
+            pendingRequestId: null,
+            pendingMessageId: null,
             activeTarget: null,
             observationPhase: 'IDLE',
             pendingObservation: null

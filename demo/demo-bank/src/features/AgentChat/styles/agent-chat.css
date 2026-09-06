@@ -48,6 +48,17 @@
   font-weight: 700;
 }
 
+.agent-protection-notice {
+  padding: 12px 14px;
+  border: 2px solid #b42318;
+  border-radius: 10px;
+  background: #fef3f2;
+  color: #7a271a;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
 .agent-message-speech,
 .agent-speech-stop,
 .agent-reconnect-button,

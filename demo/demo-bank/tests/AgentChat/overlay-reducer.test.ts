@@ -42,12 +42,17 @@ describe('Overlay conversation state', () => {
     } });
     expect(foreign.activeTarget?.targetId).toBe('target-1');
 
-    const cleared = conversationReducer(foreign, { type: 'SERVER_EVENT_RECEIVED', event: {
+    const observing = conversationReducer(foreign, { type: 'OBSERVATION_STARTED', observation: {
+      requestId: 'request-1', targetId: 'target-1', pageIdentity: 'page-1', sourceSnapshotId: 'snap-1'
+    } });
+    const cleared = conversationReducer(observing, { type: 'SERVER_EVENT_RECEIVED', event: {
       eventId: 'event-12', eventSequence: 12, eventType: 'OVERLAY_CLEAR', sessionId: 'session-1',
       targetId: 'target-1', pageIdentity: 'page-1', sourceSnapshotId: 'snap-1', reason: 'USER_ACTION',
       occurredAt: '2026-09-06T12:01:01Z'
     } });
     expect(cleared.activeTarget).toBeNull();
+    expect(cleared.observationPhase).toBe('IDLE');
+    expect(cleared.pendingObservation).toBeNull();
   });
 
   it('재연결 전환 시 이전 좌표 target을 제거한다', () => {

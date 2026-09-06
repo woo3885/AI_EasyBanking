@@ -216,6 +216,7 @@ export type ConversationAction =
   | { type: 'OBSERVATION_STARTED'; observation: PendingOverlayObservation }
   | { type: 'OBSERVATION_ACKNOWLEDGED'; requestId: string; targetId: string }
   | { type: 'OBSERVATION_FAILED'; requestId: string }
+  | { type: 'PROTECTION_ENFORCED'; clearDraft: boolean }
   | { type: 'CONNECTION_CHANGED'; connectionPhase: ConversationConnectionPhase }
   | { type: 'CONVERSATION_RESET' };
 

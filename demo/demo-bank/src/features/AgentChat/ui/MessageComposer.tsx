@@ -14,6 +14,7 @@ interface MessageComposerProps {
   onDraftChange: (value: string) => void;
   onSubmit: (message: string) => void;
   interactionBlocked?: boolean;
+  interactionBlockedReason?: string | null;
   speechRecognition?: {
     isSupported: boolean;
     isListening: boolean;
@@ -31,6 +32,7 @@ export default function MessageComposer({
   onDraftChange,
   onSubmit,
   interactionBlocked = false,
+  interactionBlockedReason = null,
   speechRecognition
 }: MessageComposerProps) {
   const [sensitiveInputBlocked, setSensitiveInputBlocked] = useState(false);
@@ -38,6 +40,9 @@ export default function MessageComposer({
     isSubmissionPending:
       isConversationSubmissionPending(submitPhase) || interactionBlocked
   });
+  const describedBy = `${DESCRIPTION_ID} ${VALIDATION_ID}${
+    interactionBlockedReason ? ' agent-protection-reason' : ''
+  }`;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -70,7 +75,7 @@ export default function MessageComposer({
         id="input-agent-message"
         value={value}
         rows={4}
-        aria-describedby={`${DESCRIPTION_ID} ${VALIDATION_ID}`}
+        aria-describedby={describedBy}
         aria-invalid={sensitiveInputBlocked ? 'true' : undefined}
         readOnly={sensitiveInputBlocked}
         onChange={(event) => handleDraftChange(event.currentTarget.value)}
@@ -102,6 +107,7 @@ export default function MessageComposer({
           <button
             type="button"
             disabled={interactionBlocked || speechRecognition.isListening}
+            aria-describedby={interactionBlockedReason ? 'agent-protection-reason' : undefined}
             onClick={speechRecognition.start}
           >
             음성 입력 시작
@@ -120,7 +126,7 @@ export default function MessageComposer({
         type="submit"
         className="agent-submit-button"
         disabled={sensitiveInputBlocked || interactionBlocked || !validation.isValid}
-        aria-describedby={`${DESCRIPTION_ID} ${VALIDATION_ID}`}
+        aria-describedby={describedBy}
         aria-busy={submitPhase === 'SUBMITTING' ? 'true' : undefined}
       >
         {submitPhase === 'SUBMITTING' ? '전송 준비 중' : '요청 전송'}
