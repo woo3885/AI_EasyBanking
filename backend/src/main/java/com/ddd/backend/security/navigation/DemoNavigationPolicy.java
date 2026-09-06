@@ -37,6 +37,9 @@ public class DemoNavigationPolicy {
                     "localhost"
             );
 
+    private static final String RAILWAY_PUBLIC_HOST_SUFFIX =
+            ".up.railway.app";
+
     /*
      * 경로 traversal 및 encoded slash/backslash 방지.
      *
@@ -418,21 +421,20 @@ public class DemoNavigationPolicy {
         String host =
                 baseUri.getHost();
 
-        /*
-         * D17 개발 Demo Bank는
-         * loopback에서만 실행한다.
-         */
-        if (host == null
-                || !ALLOWED_DEMO_HOSTS.contains(
-                host.toLowerCase(
-                        Locale.ROOT
-                )
-        )) {
+        String normalizedHost = host == null
+                ? ""
+                : host.toLowerCase(Locale.ROOT);
+        boolean loopbackHost =
+                ALLOWED_DEMO_HOSTS.contains(normalizedHost);
+        boolean railwayPublicHost =
+                normalizedHost.endsWith(RAILWAY_PUBLIC_HOST_SUFFIX)
+                        && scheme.equalsIgnoreCase("https");
+
+        if (!loopbackHost && !railwayPublicHost) {
 
             throw new IllegalStateException(
-                    "개발용 데모 사이트는 "
-                            + "127.0.0.1 또는 localhost만 "
-                            + "사용할 수 있습니다."
+                    "데모 사이트는 loopback 또는 Railway의 "
+                            + "공개 HTTPS 도메인만 사용할 수 있습니다."
             );
         }
 

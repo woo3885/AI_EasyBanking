@@ -91,6 +91,23 @@ class DemoNavigationPolicyTest {
     }
 
     @Test
+    void Railway_공개_HTTPS_데모도_허용한다() {
+        properties.setBaseUrl(
+                "https://demo-bank-production.up.railway.app"
+        );
+
+        DemoNavigationTarget target =
+                policy.resolve(
+                        "demo-bank",
+                        "/deposit/products"
+                );
+
+        assertThat(target.targetUri().toString()).isEqualTo(
+                "https://demo-bank-production.up.railway.app/deposit/products"
+        );
+    }
+
+    @Test
     void 데모_사이트가_비활성화되어_있으면_거부한다() {
         properties.setEnabled(false);
 
@@ -157,6 +174,8 @@ class DemoNavigationPolicyTest {
             "file:///tmp/demo",
             "javascript:alert(1)",
             "https://example.com",
+            "http://demo-bank-production.up.railway.app",
+            "https://up.railway.app.evil.example",
             "http://10.0.0.1:5190",
             "http://192.168.0.10:5190",
             "http://169.254.169.254",

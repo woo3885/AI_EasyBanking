@@ -1,5 +1,31 @@
 # 금융길잡이 데모뱅크
 
+## Railway 배포
+
+기존 Railway 프로젝트에 GitHub 저장소 기반 서비스를 하나 더 추가하고
+Root Directory를 `/demo/demo-bank`로 설정한다. 서비스 Variables에는 다음을 등록한다.
+
+```text
+VITE_BACKEND_BASE_URL=https://aieasybanking-production.up.railway.app
+```
+
+Build Command는 `npm ci && npm run build`, Start Command는 `npm start`를 사용한다.
+Public Networking에서 HTTPS 도메인을 발급한 뒤 백엔드 서비스에 다음을 등록한다.
+
+```text
+DDD_DEMO_BANK_ENABLED=true
+DEMO_BANK_BASE_URL=https://<발급된-데모-도메인>.up.railway.app
+```
+
+GitHub Actions의 Repository variable에도 같은 데모 주소를 등록한다.
+
+```text
+VITE_DEMO_BANK_BASE_URL=https://<발급된-데모-도메인>.up.railway.app
+```
+
+프런트와 데모 사이트의 Origin은 백엔드 CORS 및 데모 브리지 허용 목록에
+쉼표로 구분해 함께 등록한다.
+
 ## 프로젝트 목적
 
 금융길잡이 데모뱅크는 금융 자동화의 화면 이동, 사용자 직접 선택과 보안 중단 지점을 시연하기 위한 독립 프론트엔드 프로젝트다. 실제 금융회사 시스템과 연결하지 않으며 실제 예금 가입이나 송금을 수행하지 않는다.
