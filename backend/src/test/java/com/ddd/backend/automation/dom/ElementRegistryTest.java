@@ -114,7 +114,7 @@ class ElementRegistryTest {
                             <body>
 
                                 <button
-                                    id="btn-next"
+                                    id="btn-next-build-123"
                                     aria-label="다음 단계"
                                     onclick="
                                         document
@@ -167,7 +167,7 @@ class ElementRegistryTest {
                             () => {
                                 const oldButton =
                                     document.querySelector(
-                                        '#btn-next'
+                                        '#btn-next-build-123'
                                     );
 
                                 const newButton =
@@ -176,7 +176,7 @@ class ElementRegistryTest {
                                     );
 
                                 newButton.id =
-                                    'btn-next';
+                                    'btn-next-build-456';
 
                                 newButton.setAttribute(
                                     'aria-label',

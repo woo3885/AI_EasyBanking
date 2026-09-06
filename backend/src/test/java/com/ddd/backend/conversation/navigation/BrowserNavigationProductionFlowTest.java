@@ -15,11 +15,15 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.Instant;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.timeout;
 
 class BrowserNavigationProductionFlowTest {
     private final String sessionId = "session-navigation";
@@ -70,13 +74,42 @@ class BrowserNavigationProductionFlowTest {
                 .isEqualTo("/deposit/products");
         assertThat(eventStore.events(sessionId)).extracting(ConversationEvent::eventType)
                 .containsExactly("NAVIGATION_REQUIRED", "PAGE_READY_OBSERVED");
-        org.mockito.Mockito.verify(resume).resumeOnce(navigation.withStatus(PendingBrowserNavigation.Status.CONSUMED));
+        org.mockito.Mockito.verify(resume, timeout(1000))
+                .resumeOnce(navigation.withStatus(PendingBrowserNavigation.Status.CONSUMED));
 
         assertThatThrownBy(() -> service.pageReady(
                 sessionId, token, origin, bindingId, sourcePage,
                 request("request-ready-2", navigation)))
                 .isInstanceOfSatisfying(BrowserNavigationException.class,
                         error -> assertThat(error.error()).isEqualTo(BrowserNavigationError.PAGE_READY_ALREADY_ACCEPTED));
+    }
+
+    @Test
+    void resume가_실패해도_pageReady는_accepted되고_안전한_오류_event를_발행한다() throws Exception {
+        CountDownLatch failed = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            failed.countDown();
+            throw new IllegalStateException("internal fingerprint detail");
+        }).when(resume).resumeOnce(org.mockito.ArgumentMatchers.any());
+        PendingBrowserNavigation navigation = service.requireNavigation(
+                sessionId, "/deposit/products", 1, BrowserNavigationMode.SPA_PUSH, "이동");
+
+        var response = service.pageReady(sessionId, token, origin, bindingId, sourcePage,
+                request("request-ready-failure", navigation));
+
+        assertThat(response.status()).isEqualTo("PAGE_READY_ACCEPTED");
+        assertThat(failed.await(1, TimeUnit.SECONDS)).isTrue();
+        for (int index = 0; index < 100
+                && eventStore.events(sessionId).stream()
+                .noneMatch(event -> event.eventType().equals("PAGE_READY_RESUME_FAILED")); index++) {
+            Thread.sleep(10);
+        }
+        assertThat(eventStore.events(sessionId)).extracting(ConversationEvent::eventType)
+                .containsExactly("NAVIGATION_REQUIRED", "PAGE_READY_OBSERVED", "PAGE_READY_RESUME_FAILED");
+        var failure = (com.ddd.backend.conversation.event.PageReadyResumeFailedEvent)
+                eventStore.events(sessionId).getLast();
+        assertThat(failure.message()).doesNotContain("fingerprint");
+        assertThat(failure.errorCode()).isEqualTo(PageReadyResumeError.PAGE_READY_RESUME_FAILED);
     }
 
     @Test

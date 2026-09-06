@@ -5,6 +5,8 @@ import com.ddd.backend.automation.dom.SanitizedDomSnapshotService;
 import com.ddd.backend.conversation.ConversationState;
 import com.ddd.backend.conversation.MessageAcceptance;
 import com.ddd.backend.conversation.navigation.NavigationDecisionContext;
+import com.ddd.backend.conversation.navigation.PageReadyResumeError;
+import com.ddd.backend.conversation.navigation.PageReadyResumeException;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeBinding;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeRegistry;
 import org.springframework.stereotype.Service;
@@ -63,7 +65,13 @@ public class ConversationAgentDomDecisionService {
     ) {
         DemoAgentBridgeBinding bridge = bridges.find(sessionId)
                 .orElseThrow(() -> new IllegalStateException("Demo Agent bridge binding이 없습니다."));
-        SanitizedDomSnapshot snapshot = snapshots.createSnapshot(sessionId);
+        SanitizedDomSnapshot snapshot;
+        try {
+            snapshot = snapshots.createSnapshot(sessionId);
+        } catch (RuntimeException exception) {
+            throw new PageReadyResumeException(
+                    PageReadyResumeError.DESTINATION_SNAPSHOT_FAILED, exception);
+        }
         String content = state.requireMessage(context.requestMessageId()).content();
         ConversationAgentRequest request = new ConversationAgentRequest(
                 sessionId,
@@ -74,8 +82,13 @@ public class ConversationAgentDomDecisionService {
                 new ConversationAgentRequest.UserMessage(content, null),
                 new ConversationAgentRequest.SnapshotContext(
                         snapshot.snapshotId(), bridge.pageIdentity(), snapshot));
-        return new DomDecisionResult(
-                validator.validate(request, client.decide(request)), snapshot);
+        try {
+            return new DomDecisionResult(
+                    validator.validate(request, client.decide(request)), snapshot);
+        } catch (RuntimeException exception) {
+            throw new PageReadyResumeException(
+                    PageReadyResumeError.PAGE_READY_RESUME_FAILED, exception);
+        }
     }
 
     public record DomDecisionResult(
