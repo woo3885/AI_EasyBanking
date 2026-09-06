@@ -87,7 +87,7 @@ class InteractionObservationServiceTest {
                 .isEqualTo(WorkflowStatus.AI_EXECUTING);
         assertThat(eventStore.events("session-1")).extracting(event -> event.eventType())
                 .containsExactly("OVERLAY_CLEAR", "USER_ACTION_OBSERVED");
-        verify(resume, times(1)).resumeOnce(eq("session-1"),
+        verify(resume, times(1)).resumeOnce(eq("session-1"), eq("request-1"),
                 argThat(value -> value.targetId().equals("target-1") && value.consumedAt() != null),
                 eq(resulting));
 
@@ -95,7 +95,7 @@ class InteractionObservationServiceTest {
                 "http://127.0.0.1:5190", request))
                 .isInstanceOfSatisfying(OverlayTargetException.class,
                         error -> assertThat(error.error()).isEqualTo(OverlayTargetError.OBSERVATION_DUPLICATE_REQUEST));
-        verify(resume, times(1)).resumeOnce(anyString(), any(), any());
+        verify(resume, times(1)).resumeOnce(anyString(), anyString(), any(), any());
     }
 
     @Test

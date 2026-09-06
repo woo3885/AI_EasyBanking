@@ -22,6 +22,7 @@ import com.ddd.backend.conversation.ConversationService;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeService;
 import com.ddd.backend.conversation.overlay.OverlayTargetStore;
 import com.ddd.backend.conversation.gate.ConversationProtectedGateRegistry;
+import com.ddd.backend.conversation.overlay.ConversationObservationResumeAdapter;
 
 @Service
 public class AutomationSessionService {
@@ -73,6 +74,7 @@ public class AutomationSessionService {
     private DemoAgentBridgeService demoAgentBridgeService;
     private OverlayTargetStore overlayTargets;
     private ConversationProtectedGateRegistry conversationProtectedGates;
+    private ConversationObservationResumeAdapter conversationObservationResumeAdapter;
 
     @Autowired
     void setSecureInputRegistry(SecureInputRegistry secureInputRegistry) {
@@ -97,6 +99,12 @@ public class AutomationSessionService {
     @Autowired(required = false)
     void setConversationProtectedGates(ConversationProtectedGateRegistry conversationProtectedGates) {
         this.conversationProtectedGates = conversationProtectedGates;
+    }
+
+    @Autowired(required = false)
+    void setConversationObservationResumeAdapter(
+            ConversationObservationResumeAdapter conversationObservationResumeAdapter) {
+        this.conversationObservationResumeAdapter = conversationObservationResumeAdapter;
     }
 
     /*
@@ -527,6 +535,7 @@ public class AutomationSessionService {
         cleanupDemoAgentBridgeSafely(sessionId);
         cleanupOverlayTargetSafely(sessionId);
         cleanupConversationProtectedGatesSafely(sessionId);
+        cleanupConversationObservationResumeSafely(sessionId);
 
         /*
          * Playwright BrowserContext / Page 종료.
@@ -613,6 +622,7 @@ public class AutomationSessionService {
         cleanupDemoAgentBridgeSafely(sessionId);
         cleanupOverlayTargetSafely(sessionId);
         cleanupConversationProtectedGatesSafely(sessionId);
+        cleanupConversationObservationResumeSafely(sessionId);
 
         /*
          * BrowserContext / Page 종료.
@@ -734,6 +744,16 @@ public class AutomationSessionService {
             if (conversationProtectedGates != null) conversationProtectedGates.removeSession(sessionId);
         } catch (RuntimeException ignored) {
             // Protected Gate cleanup failure must not block session cleanup.
+        }
+    }
+
+    private void cleanupConversationObservationResumeSafely(String sessionId) {
+        try {
+            if (conversationObservationResumeAdapter != null) {
+                conversationObservationResumeAdapter.removeSession(sessionId);
+            }
+        } catch (RuntimeException ignored) {
+            // Observation resume cleanup failure must not block session cleanup.
         }
     }
 

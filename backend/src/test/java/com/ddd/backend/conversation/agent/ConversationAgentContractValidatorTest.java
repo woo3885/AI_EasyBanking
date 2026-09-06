@@ -48,6 +48,32 @@ class ConversationAgentContractValidatorTest {
     }
 
     @Test
+    void guide_user는_selector가_아닌_sanitized_target_reference가_필수다() {
+        var request = request(new ConversationAgentRequest.SnapshotContext(
+                "snap-1", "page-1", null));
+        var valid = new ConversationAgentDecision(
+                "req-1", "msg-1", request.goal().goalId(), 0,
+                ConversationInteractionMode.GUIDE_USER,
+                "버튼을 직접 눌러주세요.", 0.8, "USER_ACTION_REQUIRED", "DOM_CHANGE",
+                "snap-1", null, null,
+                new ConversationAgentDecision.ActionCandidate(
+                        "WAIT_FOR_USER", "el-snap-001", "button",
+                        "12개월 상품 선택", "이 버튼을 직접 눌러 주세요."));
+
+        assertThat(validator.validate(request, valid)).isSameAs(valid);
+
+        var missingTarget = new ConversationAgentDecision(
+                "req-1", "msg-1", request.goal().goalId(), 0,
+                ConversationInteractionMode.GUIDE_USER,
+                "버튼을 직접 눌러주세요.", 0.8, "USER_ACTION_REQUIRED", "DOM_CHANGE",
+                "snap-1", null, null,
+                new ConversationAgentDecision.ActionCandidate("WAIT_FOR_USER"));
+        assertThatThrownBy(() -> validator.validate(request, missingTarget))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("semantic target");
+    }
+
+    @Test
     void c가_goal_identity나_base_revision을_바꾸면_거부한다() {
         var request = request(null);
         var decision = new ConversationAgentDecision(

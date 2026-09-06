@@ -47,6 +47,24 @@ public final class ConversationAgentContractValidator {
         }
         if (decision.actionCandidate() != null && request.snapshot() == null)
             throw new IllegalArgumentException("Action candidate requires snapshot");
+        if (decision.mode() == ConversationInteractionMode.GUIDE_USER) {
+            var candidate = decision.actionCandidate();
+            if (candidate == null || !"WAIT_FOR_USER".equals(candidate.actionType())
+                    || blank(candidate.targetElementId()) || blank(candidate.role())
+                    || blank(candidate.accessibleLabel()) || blank(candidate.guide())
+                    || candidate.targetElementId().length() > 128
+                    || candidate.role().length() > 32
+                    || candidate.accessibleLabel().length() > 120
+                    || candidate.guide().length() > 200) {
+                throw new IllegalArgumentException("GUIDE_USER requires a sanitized semantic target");
+            }
+        }
+        if ((decision.mode() == ConversationInteractionMode.SECURE_INPUT_REQUIRED
+                || decision.mode() == ConversationInteractionMode.RISK_WARNING
+                || decision.mode() == ConversationInteractionMode.FINAL_CONFIRMATION_REQUIRED)
+                && decision.actionCandidate() != null) {
+            throw new IllegalArgumentException("Protected mode cannot create GUIDE_USER target");
+        }
         return decision;
     }
     private boolean blank(String value) { return value == null || value.isBlank(); }

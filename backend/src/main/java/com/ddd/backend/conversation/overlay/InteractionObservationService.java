@@ -87,7 +87,7 @@ public final class InteractionObservationService {
         events.userActionObserved(consumed, "observation-" + UUID.randomUUID(),
                 request.requestId(), resulting.snapshotId(), acceptedAt);
         ConversationObservationResumePort port = resumePort.getIfAvailable();
-        if (port != null) port.resumeOnce(sessionId, consumed, resulting);
+        if (port != null) port.resumeOnce(sessionId, request.requestId(), consumed, resulting);
         return new InteractionObservationAcceptedResponse(sessionId, request.requestId(),
                 request.targetId(), binding.pageIdentity(), request.sourceSnapshotId(),
                 "OBSERVATION_ACCEPTED", acceptedAt);
