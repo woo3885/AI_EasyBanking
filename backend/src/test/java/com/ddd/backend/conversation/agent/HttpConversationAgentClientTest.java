@@ -62,4 +62,34 @@ class HttpConversationAgentClientTest {
         assertThat(decision.mode()).isEqualTo(ConversationInteractionMode.ASK_USER);
         assertThat(decision.goalPatch().amount().value()).isEqualTo("1000000");
     }
+
+    @Test
+    void productionClientReadsCNavigationDecisionIdInsideCandidate() {
+        var goal = new UserGoalAuthority().snapshot();
+        AiEngineHttpTransport transport = new AiEngineHttpTransport() {
+            public String post(String ignored) { throw new AssertionError(); }
+            public String post(URI endpoint, String requestBody) {
+                return """
+                        {"requestId":"request-1","requestMessageId":"message-1","goalId":"%s",
+                         "baseGoalRevision":0,"mode":"NAVIGATION_REQUIRED",
+                         "message":"예금 상품 화면으로 이동이 필요합니다.","confidence":1.0,
+                         "reasonCode":"SEMANTIC_NAVIGATION_REQUIRED","nextCondition":"PAGE_READY_REDECISION",
+                         "sourceSnapshotId":"snapshot-1","goalPatch":null,"question":null,
+                         "actionCandidate":null,"navigationCandidate":{"decisionId":"navdec_1234",
+                         "semanticRoute":"DEPOSIT_PRODUCTS","navigationMode":"SPA_PUSH"}}
+                        """.formatted(goal.goalId());
+            }
+        };
+        var request = new ConversationAgentRequest("session-1", "request-1", "message-1", 1, goal,
+                new ConversationAgentRequest.UserMessage("100만원으로 12개월 예금", null),
+                new ConversationAgentRequest.SnapshotContext("snapshot-1", "page-1", null));
+        var client = new HttpConversationAgentClient(transport, new AiEngineProperties(),
+                JsonMapper.builder().build(),
+                new ConversationAgentContractValidator(new ConversationMessagePolicy()));
+
+        ConversationAgentDecision decision = client.decide(request);
+
+        assertThat(decision.navigationCandidate().decisionId()).isEqualTo("navdec_1234");
+        assertThat(decision.navigationCandidate().semanticRoute().name()).isEqualTo("DEPOSIT_PRODUCTS");
+    }
 }

@@ -123,7 +123,7 @@ class ConversationAgentContractValidatorTest {
                 ConversationInteractionMode.NAVIGATION_REQUIRED,
                 "예금 상품 화면으로 이동합니다.", 0.95, "ROUTE_REQUIRED", "PAGE_READY",
                 "snap-1", null, null, null,
-                "decision-nav-1", new ConversationAgentDecision.NavigationCandidate(
+                new ConversationAgentDecision.NavigationCandidate("decision-nav-1",
                         BrowserSemanticRoute.DEPOSIT_PRODUCTS, BrowserNavigationMode.SPA_PUSH));
 
         assertThat(validator.validate(request, valid)).isSameAs(valid);
@@ -133,7 +133,8 @@ class ConversationAgentContractValidatorTest {
                 ConversationInteractionMode.NAVIGATION_REQUIRED,
                 "이동합니다.", 0.95, "ROUTE_REQUIRED", "PAGE_READY",
                 "snap-1", null, null, null,
-                null, valid.navigationCandidate());
+                new ConversationAgentDecision.NavigationCandidate(null,
+                        BrowserSemanticRoute.DEPOSIT_PRODUCTS, BrowserNavigationMode.SPA_PUSH));
         assertThatThrownBy(() -> validator.validate(request, missingDecisionIdentity))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("structured navigationCandidate");

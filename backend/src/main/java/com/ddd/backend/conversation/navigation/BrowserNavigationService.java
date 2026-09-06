@@ -74,7 +74,8 @@ public final class BrowserNavigationService {
                 request.sourcePageIdentity(), request.destinationPageIdentity(),
                 request.routeRevision(), renderedRoute);
         UserBrowserBridgeBinding rotated = bindings.rotatePageIdentity(
-                sessionId, browserBindingId, claimed.sourcePageIdentity(), claimed.destinationPageIdentity());
+                sessionId, browserBindingId, claimed.sourcePageIdentity(),
+                claimed.destinationPageIdentity(), renderedRoute);
         PendingBrowserNavigation consumed = navigations.consume(sessionId, claimed.navigationId());
         Instant now = Instant.now();
         events.pageReadyObserved(consumed, now);
