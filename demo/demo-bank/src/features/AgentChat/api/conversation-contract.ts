@@ -11,6 +11,12 @@ import {
   parseUserActionObservedEvent,
   type OverlayParseContext
 } from './overlay-contract';
+import {
+  parseBrowserBridgeBinding,
+  parseNavigationServerEvent,
+  type NavigationParseContext
+} from './navigation-contract';
+import type { DemoAgentBridgeBinding } from '../model/overlay-types';
 
 export const SAFE_AI_RESPONSE_ERROR = 'AI 응답을 처리하지 못했습니다. 다시 시도해 주세요.';
 
@@ -23,6 +29,11 @@ export interface ConversationAcceptedAck {
   workflowStatus: ConversationWorkflowStatus;
   acceptedAt: string;
   duplicate: boolean;
+  bridgeBinding: DemoAgentBridgeBinding | null;
+}
+
+export interface InitialConversationAcceptedAck extends ConversationAcceptedAck {
+  bridgeBinding: DemoAgentBridgeBinding;
 }
 
 const workflowStatuses = new Set<ConversationWorkflowStatus>([
@@ -106,12 +117,22 @@ function parseMessage(value: unknown): ConversationMessage | null {
 
 export function parseAcceptedAck(payload: unknown): ConversationAcceptedAck | null {
   const data = envelopeData(payload);
-  if (!data || !text(data.sessionId, 128) || !text(data.requestId, 128) ||
+  const keys = [
+    'sessionId', 'requestId', 'messageId', 'acceptedSequence', 'queueStatus',
+    'workflowStatus', 'acceptedAt', 'duplicate', 'bridgeBinding'
+  ] as const;
+  if (!data || Object.keys(data).some((key) => !keys.includes(key as typeof keys[number])) ||
+      keys.some((key) => !Object.prototype.hasOwnProperty.call(data, key)) ||
+      !text(data.sessionId, 128) || !text(data.requestId, 128) ||
       !text(data.messageId, 128) || !positive(data.acceptedSequence) ||
       (data.queueStatus !== 'ACTIVE' && data.queueStatus !== 'PENDING') ||
       !status(data.workflowStatus) || !text(data.acceptedAt, 64) ||
       typeof data.duplicate !== 'boolean') return null;
-  return data as unknown as ConversationAcceptedAck;
+  const bridgeBinding = data.bridgeBinding === null
+    ? null
+    : parseBrowserBridgeBinding(data.bridgeBinding, data.sessionId);
+  if (data.bridgeBinding !== null && !bridgeBinding) return null;
+  return { ...data, bridgeBinding } as unknown as ConversationAcceptedAck;
 }
 
 export function parseConversationSnapshot(payload: unknown): ConversationSnapshot | null {
@@ -141,9 +162,18 @@ export function parseConversationSnapshot(payload: unknown): ConversationSnapsho
 
 export function parseConversationEvent(
   payload: unknown,
-  overlayContext?: OverlayParseContext
+  overlayContext?: OverlayParseContext,
+  navigationContext?: NavigationParseContext
 ): ConversationServerEvent | null {
   const item = record(payload);
+  if (item && (
+    item.eventType === 'NAVIGATION_REQUIRED' ||
+    item.eventType === 'PAGE_READY_OBSERVED' ||
+    item.eventType === 'NAVIGATION_CLEAR' ||
+    item.eventType === 'PAGE_READY_RESUME_FAILED'
+  )) {
+    return navigationContext ? parseNavigationServerEvent(item, navigationContext) : null;
+  }
   if (item?.eventType === 'OVERLAY_TARGET') {
     return overlayContext ? parseOverlayTargetEvent(item, overlayContext) : null;
   }

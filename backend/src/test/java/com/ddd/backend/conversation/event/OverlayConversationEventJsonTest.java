@@ -34,6 +34,27 @@ class OverlayConversationEventJsonTest {
         assertThat(overlay + clear + observed).doesNotContain("selector", "elementId", "locator", "http://");
     }
 
+    @Test
+    void overlay_v2는_public_target_locator만_권한있는_식별자로_노출한다() throws Exception {
+        PublicOverlayTarget target = new PublicOverlayTarget(2,
+                OverlayMaterializationMode.USER_DOM_PUBLIC_TARGET,
+                "target-2", "session-1", "page-2", "snap-2",
+                OverlayCoordinateSpace.VIEWPORT_CSS_PX,
+                new PublicOverlayTarget.Rectangle(10, 800, 200, 50),
+                new PublicOverlayTarget.Viewport(1280, 720), "button", "12개월 정기예금 선택",
+                "상품을 직접 선택해 주세요.", new PublicTargetLocator(PublicTargetLocator.TYPE,
+                "deposit-product-12m-select", "button", "12개월 정기예금 선택"),
+                OverlayActionMode.GUIDE_USER_CLICK, at, at.plusSeconds(60), null);
+
+        String json = mapper.writeValueAsString(new ConversationEventStore().overlayTarget(target, at));
+
+        assertThat(json).contains("\"contractVersion\":2",
+                "\"materializationMode\":\"USER_DOM_PUBLIC_TARGET\"",
+                "\"type\":\"PUBLIC_TARGET_KEY\"",
+                "\"publicTargetKey\":\"deposit-product-12m-select\"");
+        assertThat(json).doesNotContain("elementId", "selector", "xpath");
+    }
+
     private PublicOverlayTarget target() {
         return new PublicOverlayTarget("target-1", "session-1", "page-1", "snap-1",
                 OverlayCoordinateSpace.VIEWPORT_CSS_PX,

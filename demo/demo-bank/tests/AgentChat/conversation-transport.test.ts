@@ -81,13 +81,20 @@ describe('conversation transport', () => {
         onConnected: vi.fn(), onReconnecting: vi.fn(), onSnapshot: vi.fn(), onEvent, onSafeError: vi.fn()
       }
     });
-    transport.start('session-1', 'page-1');
+    transport.start('session-1', {
+      sessionId: 'session-1', browserBindingId: 'binding-1', bridgeToken: 'token-1',
+      pageIdentity: 'page-1', expiresAt: '2099-01-01T00:00:00Z',
+      recoveryPath: '/api/v1/sessions/session-1/conversation/bridge', pageReadyStatus: 'READY'
+    });
     handlers.onMessage(JSON.stringify({ eventId: 'event-overlay', eventSequence: 3, eventType: 'OVERLAY_TARGET',
       sessionId: 'session-1', workflowStatus: 'USER_DECISION_REQUIRED', targetId: 'target-1',
+      contractVersion: 2, materializationMode: 'USER_DOM_PUBLIC_TARGET',
       pageIdentity: 'page-1', sourceSnapshotId: 'snap-1', coordinateSpace: 'VIEWPORT_CSS_PX',
       rectangle: { x: 10, y: 20, width: 100, height: 50 },
       viewport: { width: window.innerWidth, height: window.innerHeight }, role: 'button', label: '상품 선택',
       guide: '버튼을 직접 눌러 주세요.', actionMode: 'GUIDE_USER_CLICK',
+      locator: { type: 'PUBLIC_TARGET_KEY', publicTargetKey: 'deposit-product-12m-select',
+        role: 'button', accessibleName: '상품 선택' },
       expiresAt: '2099-01-01T00:00:00Z', occurredAt: '2026-09-06T12:00:00Z' }));
     expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'OVERLAY_TARGET', targetId: 'target-1' }));
   });

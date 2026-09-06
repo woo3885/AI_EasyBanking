@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import com.ddd.backend.domain.session.WorkflowStatus;
 import com.ddd.backend.conversation.overlay.*;
 import com.ddd.backend.conversation.navigation.PendingBrowserNavigation;
+import com.ddd.backend.conversation.navigation.PageReadyResumeError;
 
 @Component
 public final class ConversationEventPublisher {
@@ -49,6 +50,10 @@ public final class ConversationEventPublisher {
     }
     public PageReadyObservedEvent pageReadyObserved(PendingBrowserNavigation navigation, Instant at) {
         return publish(store.pageReadyObserved(navigation, at));
+    }
+    public PageReadyResumeFailedEvent pageReadyResumeFailed(
+            PendingBrowserNavigation navigation, PageReadyResumeError error, Instant at) {
+        return publish(store.pageReadyResumeFailed(navigation, error, at));
     }
     public NavigationClearEvent navigationClear(PendingBrowserNavigation navigation) {
         return publish(store.navigationClear(navigation, Instant.now()));

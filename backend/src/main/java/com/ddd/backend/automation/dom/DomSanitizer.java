@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.text.Normalizer;
 
 @Component
 public final class DomSanitizer {
@@ -26,7 +27,7 @@ public final class DomSanitizer {
                         );
 
         String normalized =
-                masked
+                Normalizer.normalize(masked, Normalizer.Form.NFC)
                         .trim()
                         .replaceAll(
                                 "\\s+",

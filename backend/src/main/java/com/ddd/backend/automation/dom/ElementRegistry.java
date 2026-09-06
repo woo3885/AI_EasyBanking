@@ -3,6 +3,7 @@ package com.ddd.backend.automation.dom;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.concurrent.ConcurrentMap;
 public final class ElementRegistry {
 
     private final DomSanitizer sanitizer;
+    private final ElementFingerprintExtractor fingerprints;
 
     /*
      * sessionId별로 최신 Snapshot 하나만 유지한다.
@@ -29,11 +31,20 @@ public final class ElementRegistry {
     public ElementRegistry(
             DomSanitizer sanitizer
     ) {
+        this(sanitizer, new ElementFingerprintExtractor());
+    }
+
+    @Autowired
+    public ElementRegistry(
+            DomSanitizer sanitizer,
+            ElementFingerprintExtractor fingerprints
+    ) {
         this.sanitizer =
                 Objects.requireNonNull(
                         sanitizer,
                         "DomSanitizer는 필수입니다."
                 );
+        this.fingerprints = Objects.requireNonNull(fingerprints, "Fingerprint extractor는 필수입니다.");
     }
 
     public void replaceSnapshot(
@@ -161,9 +172,7 @@ public final class ElementRegistry {
                 );
 
         if (snapshot == null) {
-            throw new IllegalStateException(
-                    "해당 세션의 Element Registry가 없습니다."
-            );
+            throw new ElementResolutionException(ElementResolutionError.TARGET_NOT_FOUND);
         }
 
         /*
@@ -175,9 +184,7 @@ public final class ElementRegistry {
                 page.url()
         )) {
 
-            throw new IllegalStateException(
-                    "Snapshot 생성 후 페이지가 변경되었습니다."
-            );
+            throw new ElementResolutionException(ElementResolutionError.STALE_SNAPSHOT);
         }
 
         String expectedPrefix =
@@ -192,9 +199,7 @@ public final class ElementRegistry {
                 expectedPrefix
         )) {
 
-            throw new IllegalStateException(
-                    "현재 Snapshot에 속하지 않는 오래된 elementId입니다."
-            );
+            throw new ElementResolutionException(ElementResolutionError.STALE_SNAPSHOT);
         }
 
         ElementRegistration expected =
@@ -208,9 +213,7 @@ public final class ElementRegistry {
          * 실제 Registry에는 없는 ID.
          */
         if (expected == null) {
-            throw new IllegalStateException(
-                    "등록되지 않은 elementId입니다."
-            );
+            throw new ElementResolutionException(ElementResolutionError.TARGET_NOT_FOUND);
         }
 
         Locator candidates =
@@ -263,9 +266,7 @@ public final class ElementRegistry {
         }
 
         if (matchCount == 0) {
-            throw new IllegalStateException(
-                    "현재 DOM에서 elementId 대상 요소를 다시 찾을 수 없습니다."
-            );
+            throw new ElementResolutionException(ElementResolutionError.TARGET_NOT_FOUND);
         }
 
         /*
@@ -273,9 +274,7 @@ public final class ElementRegistry {
          * 임의로 첫 번째를 선택하면 안 된다.
          */
         if (matchCount > 1) {
-            throw new IllegalStateException(
-                    "현재 DOM에서 elementId 대상이 여러 개 발견되었습니다."
-            );
+            throw new ElementResolutionException(ElementResolutionError.TARGET_AMBIGUOUS);
         }
 
         return candidates.nth(
@@ -326,7 +325,7 @@ public final class ElementRegistry {
 
         String text =
                 sanitizer.sanitizeText(
-                        locator.textContent()
+                        fingerprints.semanticText(locator)
                 );
 
         String ariaLabel =
@@ -461,28 +460,6 @@ public final class ElementRegistry {
                 expected.explicitPolicy(),
                 current.explicitPolicy()
         )) {
-            return false;
-        }
-
-        /*
-         * Snapshot 당시 id/name이 존재했다면
-         * 현재도 반드시 같아야 한다.
-         */
-        if (expected.domId() != null
-                && !Objects.equals(
-                expected.domId(),
-                current.domId()
-        )) {
-
-            return false;
-        }
-
-        if (expected.name() != null
-                && !Objects.equals(
-                expected.name(),
-                current.name()
-        )) {
-
             return false;
         }
 

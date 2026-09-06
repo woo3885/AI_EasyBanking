@@ -114,7 +114,7 @@ class ElementRegistryTest {
                             <body>
 
                                 <button
-                                    id="btn-next"
+                                    id="btn-next-build-123"
                                     aria-label="다음 단계"
                                     onclick="
                                         document
@@ -167,7 +167,7 @@ class ElementRegistryTest {
                             () => {
                                 const oldButton =
                                     document.querySelector(
-                                        '#btn-next'
+                                        '#btn-next-build-123'
                                     );
 
                                 const newButton =
@@ -176,7 +176,7 @@ class ElementRegistryTest {
                                     );
 
                                 newButton.id =
-                                    'btn-next';
+                                    'btn-next-build-456';
 
                                 newButton.setAttribute(
                                     'aria-label',
@@ -286,9 +286,9 @@ class ElementRegistryTest {
                                 locator -> null
                         )
         )
-                .isInstanceOf(
-                        IllegalStateException.class
-                );
+                .isInstanceOfSatisfying(ElementResolutionException.class,
+                        error -> assertThat(error.error())
+                                .isEqualTo(ElementResolutionError.STALE_SNAPSHOT));
     }
 
     /*
@@ -337,9 +337,37 @@ class ElementRegistryTest {
                                 locator -> null
                         )
         )
-                .isInstanceOf(
-                        IllegalStateException.class
-                );
+                .isInstanceOfSatisfying(ElementResolutionException.class,
+                        error -> assertThat(error.error())
+                                .isEqualTo(ElementResolutionError.TARGET_NOT_FOUND));
+    }
+
+    @Test
+    void 동일한_버튼문구의_상품카드를_heading으로_구분해_정확히_재탐색한다() {
+        manager.execute(SESSION_ID, Duration.ofSeconds(5), page -> {
+            page.setContent("""
+                    <article><h2>12개월 정기예금</h2>
+                      <button onclick="document.body.dataset.selected='basic'">이 상품 선택</button>
+                    </article>
+                    <article><h2>우대금리 정기예금</h2>
+                      <button onclick="document.body.dataset.selected='preferred'">이 상품 선택</button>
+                    </article>
+                    """);
+            return null;
+        });
+        SanitizedDomSnapshot snapshot = snapshotService.createSnapshot(SESSION_ID);
+        String preferred = snapshot.elements().stream()
+                .filter(element -> "우대금리 정기예금".equals(element.text()))
+                .findFirst().orElseThrow().elementId();
+
+        locatorResolver.withLocator(SESSION_ID, preferred, locator -> {
+            locator.click();
+            return null;
+        });
+
+        String selected = manager.execute(SESSION_ID, Duration.ofSeconds(5),
+                page -> page.locator("body").getAttribute("data-selected"));
+        assertThat(selected).isEqualTo("preferred");
     }
 
     /*

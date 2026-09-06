@@ -8,11 +8,22 @@ public record UserBrowserBridgeBinding(
         String browserBindingId,
         String bridgeToken,
         String pageIdentity,
+        String currentRoute,
         String allowedOrigin,
         Instant expiresAt
 ) {
+    public UserBrowserBridgeBinding(String sessionId, String browserBindingId, String bridgeToken,
+            String pageIdentity, String allowedOrigin, Instant expiresAt) {
+        this(sessionId, browserBindingId, bridgeToken, pageIdentity, null, allowedOrigin, expiresAt);
+    }
     public UserBrowserBridgeBinding withPageIdentity(String nextPageIdentity) {
         return new UserBrowserBridgeBinding(
-                sessionId, browserBindingId, bridgeToken, nextPageIdentity, allowedOrigin, expiresAt);
+                sessionId, browserBindingId, bridgeToken, nextPageIdentity, currentRoute,
+                allowedOrigin, expiresAt);
+    }
+    public UserBrowserBridgeBinding withPage(String nextPageIdentity, String nextRoute) {
+        return new UserBrowserBridgeBinding(
+                sessionId, browserBindingId, bridgeToken, nextPageIdentity, nextRoute,
+                allowedOrigin, expiresAt);
     }
 }

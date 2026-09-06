@@ -11,11 +11,14 @@ import {
 import type { PublicOverlayTarget } from '../../src/features/AgentChat/model/overlay-types';
 
 const target: PublicOverlayTarget = {
+  contractVersion: 2, materializationMode: 'USER_DOM_PUBLIC_TARGET',
   targetId: 'target-1', sessionId: 'session-1', pageIdentity: 'page-1',
   sourceSnapshotId: 'snapshot-1', coordinateSpace: 'VIEWPORT_CSS_PX',
   rectangle: { x: 10, y: 20, width: 100, height: 56 },
   viewport: { width: 1280, height: 720 }, role: 'button', label: '상품 선택',
   guide: '이 버튼을 직접 눌러 주세요.', actionMode: 'GUIDE_USER_CLICK',
+  locator: { type: 'PUBLIC_TARGET_KEY', publicTargetKey: 'deposit-product-12m-select',
+    role: 'button', accessibleName: '상품 선택' },
   createdAt: '2026-09-06T00:00:00Z', expiresAt: '2099-09-06T00:01:00Z', consumedAt: null
 };
 
@@ -26,7 +29,8 @@ function activeState(overrides: Partial<ConversationState> = {}): ConversationSt
     activeTarget: target, observationPhase: 'WAITING_FOR_RESULT',
     pendingObservation: {
       requestId: 'observation-request-1', targetId: 'target-1',
-      pageIdentity: 'page-1', sourceSnapshotId: 'snapshot-1'
+      pageIdentity: 'page-1', sourceSnapshotId: 'snapshot-1',
+      publicTargetKey: 'deposit-product-12m-select'
     },
     submitPhase: 'WAITING_FOR_ACK', pendingRequestId: 'message-request-1',
     pendingMessageId: 'message-1',
@@ -84,9 +88,12 @@ describe('AgentChat protected-state reducer hardening', () => {
     const event: OverlayTargetEvent = {
       eventId: 'event-protected-target', eventSequence: 1, eventType: 'OVERLAY_TARGET',
       sessionId: 'session-1', workflowStatus: 'FINAL_CONFIRMATION_REQUIRED',
+      contractVersion: 2, materializationMode: 'USER_DOM_PUBLIC_TARGET',
       targetId: 'target-2', pageIdentity: 'page-1', sourceSnapshotId: 'snapshot-2',
       coordinateSpace: 'VIEWPORT_CSS_PX', rectangle: target.rectangle,
       viewport: target.viewport, role: 'button', label: '최종 승인', guide: '직접 확인해 주세요.',
+      locator: { type: 'PUBLIC_TARGET_KEY', publicTargetKey: 'deposit-final-approve',
+        role: 'button', accessibleName: '최종 승인' },
       actionMode: 'GUIDE_USER_CLICK', expiresAt: target.expiresAt,
       occurredAt: '2026-09-06T00:00:01Z'
     };

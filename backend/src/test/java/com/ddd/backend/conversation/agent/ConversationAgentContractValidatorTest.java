@@ -3,6 +3,10 @@ package com.ddd.backend.conversation.agent;
 import com.ddd.backend.conversation.ConversationMessagePolicy;
 import com.ddd.backend.conversation.goal.UserGoalAuthority;
 import com.ddd.backend.conversation.goal.UserGoalPatch;
+import com.ddd.backend.conversation.navigation.BrowserNavigationMode;
+import com.ddd.backend.conversation.navigation.BrowserSemanticRoute;
+import com.ddd.backend.conversation.navigation.PageReadyResumeError;
+import com.ddd.backend.conversation.overlay.GuideUserMaterializationException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -43,8 +47,8 @@ class ConversationAgentContractValidatorTest {
                 new ConversationAgentDecision.ActionCandidate("CLICK"));
 
         assertThatThrownBy(() -> validator.validate(request, decision))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("sourceSnapshotId");
+                .isInstanceOfSatisfying(GuideUserMaterializationException.class,
+                        error -> assertThat(error.error()).isEqualTo(PageReadyResumeError.GUIDE_USER_TARGET_INVALID));
     }
 
     @Test
@@ -69,8 +73,17 @@ class ConversationAgentContractValidatorTest {
                 "snap-1", null, null,
                 new ConversationAgentDecision.ActionCandidate("WAIT_FOR_USER"));
         assertThatThrownBy(() -> validator.validate(request, missingTarget))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("semantic target");
+                .isInstanceOfSatisfying(GuideUserMaterializationException.class,
+                        error -> assertThat(error.error()).isEqualTo(PageReadyResumeError.GUIDE_USER_TARGET_INVALID));
+
+        var missingCandidate = new ConversationAgentDecision(
+                "req-1", "msg-1", request.goal().goalId(), 0,
+                ConversationInteractionMode.GUIDE_USER,
+                "버튼을 직접 눌러주세요.", 0.8, "USER_ACTION_REQUIRED", "DOM_CHANGE",
+                "snap-1", null, null, null);
+        assertThatThrownBy(() -> validator.validate(request, missingCandidate))
+                .isInstanceOfSatisfying(GuideUserMaterializationException.class,
+                        error -> assertThat(error.error()).isEqualTo(PageReadyResumeError.GUIDE_USER_TARGET_MISSING));
     }
 
     @Test
@@ -110,6 +123,32 @@ class ConversationAgentContractValidatorTest {
         assertThatThrownBy(() -> validator.validate(request, invalid))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("GOAL_PATCH_PROPOSED");
+    }
+
+    @Test
+    void navigation_required는_selector나_url이_아닌_semantic_route만_허용한다() {
+        var request = request(new ConversationAgentRequest.SnapshotContext(
+                "snap-1", "page-1", null));
+        var valid = new ConversationAgentDecision(
+                "req-1", "msg-1", request.goal().goalId(), 0,
+                ConversationInteractionMode.NAVIGATION_REQUIRED,
+                "예금 상품 화면으로 이동합니다.", 0.95, "ROUTE_REQUIRED", "PAGE_READY",
+                "snap-1", null, null, null,
+                new ConversationAgentDecision.NavigationCandidate("decision-nav-1",
+                        BrowserSemanticRoute.DEPOSIT_PRODUCTS, BrowserNavigationMode.SPA_PUSH));
+
+        assertThat(validator.validate(request, valid)).isSameAs(valid);
+
+        var missingDecisionIdentity = new ConversationAgentDecision(
+                "req-1", "msg-1", request.goal().goalId(), 0,
+                ConversationInteractionMode.NAVIGATION_REQUIRED,
+                "이동합니다.", 0.95, "ROUTE_REQUIRED", "PAGE_READY",
+                "snap-1", null, null, null,
+                new ConversationAgentDecision.NavigationCandidate(null,
+                        BrowserSemanticRoute.DEPOSIT_PRODUCTS, BrowserNavigationMode.SPA_PUSH));
+        assertThatThrownBy(() -> validator.validate(request, missingDecisionIdentity))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("structured navigationCandidate");
     }
 
     private ConversationAgentRequest request(

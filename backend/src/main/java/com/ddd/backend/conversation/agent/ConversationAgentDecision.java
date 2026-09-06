@@ -1,12 +1,29 @@
 package com.ddd.backend.conversation.agent;
 import com.ddd.backend.conversation.goal.UserGoalPatch;
+import com.ddd.backend.conversation.navigation.BrowserNavigationMode;
+import com.ddd.backend.conversation.navigation.BrowserSemanticRoute;
 public record ConversationAgentDecision(
         String requestId, String requestMessageId, String goalId, long baseGoalRevision,
         ConversationInteractionMode mode, String message, double confidence, String reasonCode,
         String nextCondition, String sourceSnapshotId, UserGoalPatch goalPatch,
-        QuestionCandidate question, ActionCandidate actionCandidate
+        QuestionCandidate question, ActionCandidate actionCandidate,
+        NavigationCandidate navigationCandidate
 ) {
+    public ConversationAgentDecision(
+            String requestId, String requestMessageId, String goalId, long baseGoalRevision,
+            ConversationInteractionMode mode, String message, double confidence, String reasonCode,
+            String nextCondition, String sourceSnapshotId, UserGoalPatch goalPatch,
+            QuestionCandidate question, ActionCandidate actionCandidate) {
+        this(requestId, requestMessageId, goalId, baseGoalRevision, mode, message, confidence,
+                reasonCode, nextCondition, sourceSnapshotId, goalPatch, question, actionCandidate, null);
+    }
+
     public record QuestionCandidate(String fieldKey) { }
+    public record NavigationCandidate(
+            String decisionId,
+            BrowserSemanticRoute semanticRoute,
+            BrowserNavigationMode navigationMode
+    ) { }
     public record ActionCandidate(
             String actionType,
             String targetElementId,

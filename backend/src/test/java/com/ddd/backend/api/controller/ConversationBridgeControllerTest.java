@@ -14,16 +14,20 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.context.annotation.Import;
+import com.ddd.backend.config.RestCorsConfig;
 
 import java.time.Instant;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ConversationBridgeController.class)
 @EnableConfigurationProperties(RestCorsProperties.class)
+@Import(RestCorsConfig.class)
 class ConversationBridgeControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean AutomationSessionService sessions;
@@ -69,5 +73,33 @@ class ConversationBridgeControllerTest {
                         .header("Origin", "http://127.0.0.1:5190"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value("BRIDGE_401_INVALID_IDENTITY"));
+    }
+
+    @Test
+    void demo_origin_recovery_preflight는_필요한_identity_header만_허용한다() throws Exception {
+        mockMvc.perform(options("/api/v1/sessions/session-1/conversation/bridge")
+                        .header("Origin", "http://127.0.0.1:5190")
+                        .header("Access-Control-Request-Method", "GET")
+                        .header("Access-Control-Request-Headers",
+                                "X-DDD-Bridge-Token,X-DDD-Browser-Binding-Id,X-DDD-Page-Identity,Content-Type"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .header().string("Access-Control-Allow-Origin", "http://127.0.0.1:5190"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .header().string("Access-Control-Allow-Headers",
+                                org.hamcrest.Matchers.containsString("X-DDD-Bridge-Token")));
+    }
+
+    @Test
+    void 허용되지_않은_origin과_header의_preflight는_차단한다() throws Exception {
+        mockMvc.perform(options("/api/v1/sessions/session-1/conversation/bridge")
+                        .header("Origin", "https://evil.example")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(options("/api/v1/sessions/session-1/conversation/bridge")
+                        .header("Origin", "http://127.0.0.1:5190")
+                        .header("Access-Control-Request-Method", "GET")
+                        .header("Access-Control-Request-Headers", "X-Unsafe-Header"))
+                .andExpect(status().isForbidden());
     }
 }

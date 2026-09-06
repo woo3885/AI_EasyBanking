@@ -8,6 +8,7 @@ public record BrowserTaskResult<T>(
         BrowserTaskStatus status,
         T data,
         String message,
+        Throwable failureCause,
         Instant startedAt,
         Instant completedAt
 ) {
@@ -23,6 +24,7 @@ public record BrowserTaskResult<T>(
                 BrowserTaskStatus.SUCCESS,
                 data,
                 null,
+                null,
                 startedAt,
                 Instant.now()
         );
@@ -31,6 +33,7 @@ public record BrowserTaskResult<T>(
     public static <T> BrowserTaskResult<T> failed(
             BrowserTask<T> task,
             String safeMessage,
+            Throwable failureCause,
             Instant startedAt
     ) {
         return new BrowserTaskResult<>(
@@ -39,6 +42,7 @@ public record BrowserTaskResult<T>(
                 BrowserTaskStatus.FAILED,
                 null,
                 safeMessage,
+                failureCause,
                 startedAt,
                 Instant.now()
         );
@@ -54,6 +58,7 @@ public record BrowserTaskResult<T>(
                 BrowserTaskStatus.TIMED_OUT,
                 null,
                 "브라우저 작업 제한시간을 초과했습니다.",
+                null,
                 startedAt,
                 Instant.now()
         );
@@ -69,6 +74,7 @@ public record BrowserTaskResult<T>(
                 BrowserTaskStatus.CANCELLED,
                 null,
                 "브라우저 작업이 취소되었습니다.",
+                null,
                 startedAt,
                 Instant.now()
         );

@@ -43,6 +43,7 @@ class ConversationDay1VerticalSliceTest {
         ConversationSnapshot snapshot = conversations.snapshot(session.getSessionId());
         assertThat(snapshot.activeQuestion()).isNull();
         assertThat(snapshot.userGoal().duration()).isEqualTo(new UserGoal.Duration(12, "MONTH"));
+        assertThat(snapshot.userGoal().stage()).isEqualTo("DEPOSIT_ENTRY");
         assertThat(snapshot.workflowStatus()).isEqualTo(WorkflowStatus.AI_EXECUTING);
     }
 
@@ -85,6 +86,7 @@ class ConversationDay1VerticalSliceTest {
         assertThat(snapshot.userGoal().amount()).isEqualTo(new UserGoal.Amount("1000000", "KRW"));
         assertThat(snapshot.userGoal().duration()).isNull();
         assertThat(snapshot.userGoal().missingFields()).containsExactly("duration");
+        assertThat(snapshot.userGoal().stage()).isEqualTo("INFORMATION_COLLECTION");
         assertThat(snapshot.activeQuestion()).isNotNull();
         assertThat(snapshot.activeQuestion().questionId()).isEqualTo(snapshot.userGoal().pendingQuestion().questionId());
         assertThat(snapshot.activeQuestion().goalRevision()).isEqualTo(1);
@@ -113,6 +115,7 @@ class ConversationDay1VerticalSliceTest {
         ConversationSnapshot updated = conversations.snapshot(session.getSessionId());
         assertThat(updated.userGoal().revision()).isEqualTo(2);
         assertThat(updated.userGoal().duration()).isEqualTo(new UserGoal.Duration(12, "MONTH"));
+        assertThat(updated.userGoal().stage()).isEqualTo("DEPOSIT_ENTRY");
         assertThat(updated.activeQuestion()).isNull();
         assertThat(updated.workflowStatus()).isEqualTo(WorkflowStatus.AI_EXECUTING);
         assertThat(events.events(session.getSessionId()))

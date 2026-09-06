@@ -37,6 +37,7 @@ class UserBrowserOverlayIdentityTest {
         Locator locator = mock(Locator.class);
         when(locator.isVisible()).thenReturn(true);
         when(locator.isEnabled()).thenReturn(true);
+        when(locator.getAttribute("data-ddd-public-target")).thenReturn("deposit-product-12m-select");
         when(locator.evaluate(anyString())).thenReturn(Map.of(
                 "x", 1, "y", 2, "width", 100, "height", 30,
                 "viewportWidth", 1280, "viewportHeight", 720, "topLevel", true));
@@ -63,13 +64,16 @@ class UserBrowserOverlayIdentityTest {
                 "1.0", "snapshot-1", new SanitizedDomSnapshot.PageSnapshot("redacted", "예금"),
                 List.of(new SanitizedDomSnapshot.ElementSnapshot(
                         "element-1", "button", "button", "12개월", null, null, null,
-                        true, true, new SanitizedDomSnapshot.BoundingBoxSnapshot(1, 2, 100, 30),
-                        SanitizedDomSnapshot.SecurityPolicy.USER_DECISION)));
+                        true, true, null, new SanitizedDomSnapshot.BoundingBoxSnapshot(1, 2, 100, 30),
+                        SanitizedDomSnapshot.SecurityPolicy.USER_DECISION,
+                        "deposit-product-12m-select")));
 
         PublicOverlayTarget target = service.create(
                 "session-1", "playwright-page", snapshot, "element-1", "선택해 주세요.");
 
         assertThat(target.pageIdentity()).isEqualTo("user-page");
         assertThat(target.pageIdentity()).isNotEqualTo("playwright-page");
+        assertThat(target.contractVersion()).isEqualTo(2);
+        assertThat(target.locator().publicTargetKey()).isEqualTo("deposit-product-12m-select");
     }
 }

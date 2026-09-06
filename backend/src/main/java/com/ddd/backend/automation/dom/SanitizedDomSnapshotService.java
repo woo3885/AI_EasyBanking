@@ -17,6 +17,7 @@ import java.util.Set;
 import com.ddd.backend.security.secureinput.SecureInputRegistry;
 import com.ddd.backend.service.decision.SelectedDepositProductStore;
 import com.ddd.backend.conversation.overlay.OverlayTargetStore;
+import com.ddd.backend.conversation.overlay.PublicTargetKeyPolicy;
 
 @Service
 public final class SanitizedDomSnapshotService {
@@ -161,6 +162,7 @@ public final class SanitizedDomSnapshotService {
                             new ArrayList<>();
 
                     Set<String> userDecisionLabels = new HashSet<>();
+                    Set<String> publicTargetKeys = new HashSet<>();
 
                     /*
                      * D16 Registry 등록용 데이터.
@@ -264,6 +266,10 @@ public final class SanitizedDomSnapshotService {
                                     "사용자 선택 label을 안전하게 구분할 수 없습니다.");
                         }
 
+                        String publicTargetKey = sanitizePublicTargetKey(element.publicTargetKey());
+                        if (publicTargetKey != null && !publicTargetKeys.add(publicTargetKey)) {
+                            throw new IllegalStateException("동일 페이지의 공개 target key가 중복되었습니다.");
+                        }
                         sanitizedElements.add(
                                 new SanitizedDomSnapshot
                                         .ElementSnapshot(
@@ -278,7 +284,8 @@ public final class SanitizedDomSnapshotService {
                                         element.enabled(),
                                         element.checked(),
                                         boundingBox,
-                                        securityPolicy
+                                        securityPolicy,
+                                        publicTargetKey
                                 )
                         );
 
@@ -345,6 +352,15 @@ public final class SanitizedDomSnapshotService {
                     );
                 }
         );
+    }
+
+    private String sanitizePublicTargetKey(String value) {
+        if (value == null || value.isBlank()) return null;
+        String key = value.trim();
+        if (!PublicTargetKeyPolicy.isValid(key)) {
+            throw new IllegalStateException("공개 target key 형식이 올바르지 않습니다.");
+        }
+        return key;
     }
 
     private String detailProductId(String url, com.microsoft.playwright.Page page) {

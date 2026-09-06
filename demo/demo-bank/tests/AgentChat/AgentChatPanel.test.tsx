@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import HomePage from '../../src/pages/HomePage';
+import App from '../../src/App';
 import {
   SAFE_MESSAGE_SUBMIT_ERROR,
   type ConversationMessage
@@ -235,7 +235,7 @@ describe('AgentChatPanel', () => {
   });
 
   it('실제 Demo Bank 페이지와 채팅 shell을 동일 레이아웃에 렌더링한다', () => {
-    render(<HomePage />);
+    render(<App />);
 
     expect(screen.getByTestId('page-home')).toBeInTheDocument();
     expect(

@@ -4,6 +4,8 @@ import com.ddd.backend.automation.dom.ElementRegistry;
 import com.ddd.backend.automation.dom.SanitizedDomSnapshot;
 import com.ddd.backend.automation.session.BrowserSessionManager;
 import com.ddd.backend.conversation.ConversationMessagePolicy;
+import com.ddd.backend.conversation.ConversationService;
+import com.ddd.backend.conversation.goal.GoalRouteCompatibilityPolicy;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeBinding;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeRegistry;
 import com.ddd.backend.conversation.bridge.UserBrowserBridgeRegistry;
@@ -12,6 +14,8 @@ import com.ddd.backend.conversation.event.ConversationEventPublisher;
 import com.microsoft.playwright.Locator;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -21,9 +25,11 @@ import java.util.Set;
 import java.util.UUID;
 
 import static com.ddd.backend.conversation.overlay.OverlayTargetError.TARGET_NOT_INTERACTABLE;
+import com.ddd.backend.conversation.navigation.PageReadyResumeError;
 
 @Service
 public final class OverlayTargetService {
+    private static final Logger log = LoggerFactory.getLogger(OverlayTargetService.class);
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
     private static final Set<String> ALLOWED_ROLES = Set.of("button", "link", "radio", "checkbox", "option");
     private final BrowserSessionManager browsers;
@@ -34,6 +40,8 @@ public final class OverlayTargetService {
     private final ConversationMessagePolicy textPolicy;
     private UserBrowserBridgeRegistry userBrowserBindings;
     private BrowserNavigationService browserNavigations;
+    private ConversationService conversations;
+    private GoalRouteCompatibilityPolicy goalRoutes;
 
     public OverlayTargetService(BrowserSessionManager browsers, ElementRegistry elements,
             DemoAgentBridgeRegistry bridges, OverlayTargetStore targets,
@@ -53,6 +61,13 @@ public final class OverlayTargetService {
         this.browserNavigations = navigations;
     }
 
+    @Autowired(required = false)
+    void setConversationGoalRouteGate(
+            ConversationService conversations, GoalRouteCompatibilityPolicy goalRoutes) {
+        this.conversations = conversations;
+        this.goalRoutes = goalRoutes;
+    }
+
     public PublicOverlayTarget create(String sessionId, String pageIdentity,
             SanitizedDomSnapshot snapshot, String internalElementId, String guide) {
         DemoAgentBridgeBinding bridge = bridges.find(sessionId)
@@ -61,11 +76,17 @@ public final class OverlayTargetService {
         if (browserNavigations != null && browserNavigations.blocksTarget(sessionId)) {
             throw new OverlayTargetException(OverlayTargetError.TARGET_NOT_INTERACTABLE);
         }
-        String publicPageIdentity = userBrowserBindings == null
-                ? pageIdentity
+        var userBinding = userBrowserBindings == null ? null
                 : userBrowserBindings.find(sessionId)
-                        .orElseThrow(() -> new OverlayTargetException(OverlayTargetError.BRIDGE_TOKEN_INVALID))
-                        .pageIdentity();
+                        .orElseThrow(() -> new OverlayTargetException(OverlayTargetError.BRIDGE_TOKEN_INVALID));
+        if (conversations != null && goalRoutes != null) {
+            String userRoute = userBinding == null ? null : userBinding.currentRoute();
+            if (!goalRoutes.allowsOverlay(
+                    conversations.state(sessionId).goal(), userRoute, snapshot.page().url())) {
+                throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
+            }
+        }
+        String publicPageIdentity = userBinding == null ? pageIdentity : userBinding.pageIdentity();
         SanitizedDomSnapshot.ElementSnapshot source = snapshot.elements().stream()
                 .filter(element -> element.elementId().equals(internalElementId)).findFirst()
                 .orElseThrow(() -> new OverlayTargetException(OverlayTargetError.TARGET_NOT_FOUND));
@@ -73,9 +94,19 @@ public final class OverlayTargetService {
         String label = safeText(source.ariaLabel() == null || source.ariaLabel().isBlank()
                 ? source.text() : source.ariaLabel(), 120);
         String safeGuide = safeText(guide, 200);
+        String publicTargetKey = source.publicTargetKey();
+        if (userBinding != null && !validPublicTargetKey(publicTargetKey)) {
+            throw new GuideUserMaterializationException(PageReadyResumeError.GUIDE_USER_TARGET_INVALID);
+        }
         Geometry geometry = browsers.execute(sessionId, TIMEOUT, page -> {
             Locator locator = elements.resolveLocator(page, sessionId, internalElementId);
             if (!locator.isVisible() || !locator.isEnabled()) throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
+            if (userBinding != null) {
+                String resolvedKey = locator.getAttribute("data-ddd-public-target");
+                if (!publicTargetKey.equals(resolvedKey)) {
+                    throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
+                }
+            }
             Object raw = locator.evaluate("element => { const r=element.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height,viewportWidth:window.innerWidth,viewportHeight:window.innerHeight,topLevel:window===window.top}; }");
             Map<?, ?> values = (Map<?, ?>) raw;
             if (!Boolean.TRUE.equals(values.get("topLevel"))) throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
@@ -84,16 +115,36 @@ public final class OverlayTargetService {
         });
         Instant now = Instant.now();
         PublicOverlayTarget target = new PublicOverlayTarget(
+                userBinding == null ? 1 : 2,
+                userBinding == null ? OverlayMaterializationMode.BACKEND_VIEWPORT_RECT
+                        : OverlayMaterializationMode.USER_DOM_PUBLIC_TARGET,
                 UUID.randomUUID().toString(), sessionId, publicPageIdentity, snapshot.snapshotId(),
                 OverlayCoordinateSpace.VIEWPORT_CSS_PX,
                 new PublicOverlayTarget.Rectangle(geometry.x, geometry.y, geometry.width, geometry.height),
                 new PublicOverlayTarget.Viewport(geometry.viewportWidth, geometry.viewportHeight),
-                role, label, safeGuide, OverlayActionMode.GUIDE_USER_CLICK,
+                role, label, safeGuide,
+                userBinding == null ? null : new PublicTargetLocator(
+                        PublicTargetLocator.TYPE, publicTargetKey, role, label),
+                OverlayActionMode.GUIDE_USER_CLICK,
                 now, targets.expiresAt(), null);
-        PublicOverlayTarget saved = targets.replace(
-                target, internalElementId, DomSnapshotFingerprint.of(snapshot));
-        events.overlayTarget(saved, now);
-        return saved;
+        PublicOverlayTarget saved;
+        try {
+            saved = targets.replace(target, internalElementId, DomSnapshotFingerprint.of(snapshot));
+        } catch (RuntimeException exception) {
+            log.error("Overlay target materialization failed. errorCode={} causeType={} reason={}",
+                    PageReadyResumeError.OVERLAY_TARGET_MATERIALIZATION_FAILED,
+                    exception.getClass().getSimpleName(), exception.getMessage());
+            throw new GuideUserMaterializationException(
+                    PageReadyResumeError.OVERLAY_TARGET_MATERIALIZATION_FAILED, exception);
+        }
+        try {
+            events.overlayTarget(saved, now);
+            return saved;
+        } catch (RuntimeException exception) {
+            targets.removeSession(sessionId);
+            throw new GuideUserMaterializationException(
+                    PageReadyResumeError.OVERLAY_EVENT_PUBLISH_FAILED, exception);
+        }
     }
 
     public PublicOverlayTarget create(String sessionId, SanitizedDomSnapshot snapshot,
@@ -119,6 +170,9 @@ public final class OverlayTargetService {
         normalized = normalized.toLowerCase(Locale.ROOT);
         if (!ALLOWED_ROLES.contains(normalized)) throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
         return normalized;
+    }
+    private boolean validPublicTargetKey(String value) {
+        return PublicTargetKeyPolicy.isValid(value);
     }
     private String safeText(String value, int maxLength) {
         String safe = textPolicy.sanitize(value);

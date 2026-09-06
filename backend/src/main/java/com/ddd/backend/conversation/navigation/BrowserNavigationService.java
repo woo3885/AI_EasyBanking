@@ -10,6 +10,8 @@ import com.ddd.backend.domain.session.AutomationSessionRepository;
 import com.ddd.backend.domain.session.WorkflowStatus;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -17,11 +19,15 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import jakarta.annotation.PreDestroy;
 
 import static com.ddd.backend.conversation.navigation.BrowserNavigationError.*;
 
 @Service
 public final class BrowserNavigationService {
+    private static final Logger log = LoggerFactory.getLogger(BrowserNavigationService.class);
     private static final Duration TTL = Duration.ofMinutes(2);
     private static final Set<WorkflowStatus> BLOCKED = Set.of(
             WorkflowStatus.SECURE_INPUT_REQUIRED, WorkflowStatus.RISK_WARNING,
@@ -33,6 +39,7 @@ public final class BrowserNavigationService {
     private final BrowserNavigationRoutePolicy routes;
     private final ConversationEventPublisher events;
     private final ObjectProvider<BrowserPageReadyResumePort> resumePort;
+    private final ExecutorService resumeExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     public BrowserNavigationService(AutomationSessionRepository sessions,
             UserBrowserBridgeRegistry bindings, PendingBrowserNavigationRegistry navigations,
@@ -63,6 +70,10 @@ public final class BrowserNavigationService {
     public BrowserPageReadyResponse pageReady(String sessionId, String token, String origin,
             String browserBindingId, String headerPageIdentity, BrowserPageReadyRequest request) {
         requireSession(sessionId);
+        BrowserPageReadyResumePort port = resumePort.getIfAvailable();
+        if (port == null) {
+            throw new IllegalStateException("Browser page-ready resume port가 준비되지 않았습니다.");
+        }
         bindings.authenticateForNavigation(
                 sessionId, token, origin, browserBindingId);
         if (!request.sourcePageIdentity().equals(headerPageIdentity)) {
@@ -74,12 +85,10 @@ public final class BrowserNavigationService {
                 request.sourcePageIdentity(), request.destinationPageIdentity(),
                 request.routeRevision(), renderedRoute);
         UserBrowserBridgeBinding rotated = bindings.rotatePageIdentity(
-                sessionId, browserBindingId, claimed.sourcePageIdentity(), claimed.destinationPageIdentity());
+                sessionId, browserBindingId, claimed.sourcePageIdentity(),
+                claimed.destinationPageIdentity(), renderedRoute);
         PendingBrowserNavigation consumed = navigations.consume(sessionId, claimed.navigationId());
-        Instant now = Instant.now();
-        events.pageReadyObserved(consumed, now);
-        BrowserPageReadyResumePort port = resumePort.getIfAvailable();
-        if (port != null) port.resumeOnce(consumed);
+        resumeExecutor.submit(() -> observeAndResume(port, consumed));
         return new BrowserPageReadyResponse(
                 sessionId, request.requestId(), consumed.navigationId(), rotated.browserBindingId(),
                 consumed.sourcePageIdentity(), rotated.pageIdentity(), consumed.routeRevision(),
@@ -93,6 +102,35 @@ public final class BrowserNavigationService {
     private AutomationSession requireSession(String sessionId) {
         return sessions.findById(sessionId)
                 .orElseThrow(() -> new BrowserNavigationException(NAVIGATION_NOT_FOUND));
+    }
+    private void observeAndResume(BrowserPageReadyResumePort port, PendingBrowserNavigation navigation) {
+        try {
+            events.pageReadyObserved(navigation, Instant.now());
+            port.resumeOnce(navigation);
+        } catch (RuntimeException exception) {
+            PageReadyResumeError error = PageReadyResumeErrors.classify(exception);
+            try {
+                events.pageReadyResumeFailed(navigation, error, Instant.now());
+            } catch (RuntimeException publishFailure) {
+                log.error("Page-ready failure event publish failed. sessionRef={} navigationRef={} domainError={}",
+                        safeRef(navigation.sessionId()), safeRef(navigation.navigationId()),
+                        PageReadyResumeError.OVERLAY_EVENT_PUBLISH_FAILED.name());
+            }
+        }
+    }
+    private String safeRef(String value) {
+        if (value == null) return "none";
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(digest, 0, 6);
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            return "unavailable";
+        }
+    }
+    @PreDestroy
+    void closeResumeExecutor() {
+        resumeExecutor.close();
     }
     private String safeGuide(String guide) {
         if (guide == null || guide.isBlank() || guide.length() > 200

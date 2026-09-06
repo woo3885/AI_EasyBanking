@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 public final class UserGoalAuthority {
+    private final UserGoalCompletenessPolicy completeness = new UserGoalCompletenessPolicy();
     private UserGoal goal = new UserGoal(UUID.randomUUID().toString(), 0, "ACTIVE", "UNKNOWN",
             "pending", null, null, List.of(), null, "INFORMATION_COLLECTION",
             new UserGoal.Safety(false, "NONE", "NONE"), null);
@@ -39,8 +40,9 @@ public final class UserGoalAuthority {
     private UserGoal copy(long revision, String status, String intent, String request,
                           UserGoal.Amount amount, UserGoal.Duration duration, List<String> missing,
                           UserGoal.PendingQuestion question, String lastMessage) {
+        String stage = completeness.stage(status, intent, amount, duration, missing, question);
         return new UserGoal(goal.goalId(), revision, status, intent, request, amount, duration, missing,
-                question, "INFORMATION_COLLECTION", goal.safety(), lastMessage);
+                question, stage, goal.safety(), lastMessage);
     }
     private String choose(String value, String fallback) { return value == null || value.isBlank() ? fallback : value.trim(); }
 }

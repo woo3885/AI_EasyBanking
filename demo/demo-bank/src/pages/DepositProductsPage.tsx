@@ -6,6 +6,7 @@ import {
   createDepositProductDetailPath,
   ROUTES
 } from '../constants/routes';
+import { DEPOSIT_PRODUCT_PUBLIC_TARGET_KEYS } from '../constants/public-overlay-targets';
 import { depositProducts, formatWon } from '../data/demo-data';
 
 export default function DepositProductsPage() {
@@ -78,6 +79,9 @@ export default function DepositProductsPage() {
 
               <button
                 {...elementIdentity(product.selectButtonElementId)}
+                data-ddd-public-target={
+                  DEPOSIT_PRODUCT_PUBLIC_TARGET_KEYS[product.id]
+                }
                 type="button"
                 className="primary-button"
                 aria-pressed={isSelected}

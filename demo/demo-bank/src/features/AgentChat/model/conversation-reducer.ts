@@ -2,6 +2,7 @@ import { isConversationSubmissionPending, validateChatMessage } from './chat-mes
 import {
   createInitialConversationState,
   SAFE_MESSAGE_SUBMIT_ERROR,
+  SAFE_RESPONSE_ERROR,
   type ActiveConversationQuestion,
   type AiQuestionEvent,
   type ConversationAction,
@@ -41,7 +42,11 @@ function toMessage(event: ConversationServerEvent): ConversationMessage | null {
     event.eventType === 'USER_MESSAGE_ACCEPTED' ||
     event.eventType === 'OVERLAY_TARGET' ||
     event.eventType === 'OVERLAY_CLEAR' ||
-    event.eventType === 'USER_ACTION_OBSERVED'
+    event.eventType === 'USER_ACTION_OBSERVED' ||
+    event.eventType === 'NAVIGATION_REQUIRED' ||
+    event.eventType === 'PAGE_READY_OBSERVED' ||
+    event.eventType === 'NAVIGATION_CLEAR' ||
+    event.eventType === 'PAGE_READY_RESUME_FAILED'
   ) return null;
   if (event.eventType === 'AI_QUESTION') {
     return {
@@ -80,6 +85,74 @@ function applyServerEvent(state: ConversationState, event: ConversationServerEve
     safeError: null
   };
 
+  if (event.eventType === 'NAVIGATION_REQUIRED') {
+    if (isProtectedWorkflowStatus(state.workflowStatus)) return { ...state, ...common };
+    return {
+      ...state,
+      ...common,
+      workflowStatus: 'PAGE_LOADING',
+      pendingNavigation: {
+        navigationId: event.navigationId,
+        browserBindingId: event.browserBindingId,
+        sourcePageIdentity: event.sourcePageIdentity,
+        destinationPageIdentity: event.destinationPageIdentity,
+        destinationRoute: event.destinationRoute,
+        routeRevision: event.routeRevision,
+        navigationMode: event.navigationMode,
+        expiresAt: event.expiresAt,
+        guide: event.guide
+      },
+      observedNavigationId: null,
+      activeTarget: null,
+      observationPhase: 'IDLE',
+      pendingObservation: null
+    };
+  }
+
+  if (event.eventType === 'PAGE_READY_OBSERVED') {
+    const pending = state.pendingNavigation;
+    const matches = pending?.navigationId === event.navigationId &&
+      pending.browserBindingId === event.browserBindingId &&
+      pending.sourcePageIdentity === event.sourcePageIdentity &&
+      pending.destinationPageIdentity === event.pageIdentity &&
+      pending.routeRevision === event.routeRevision;
+    if (!matches) return { ...state, ...common };
+    const identityAlreadyRotated = state.pageIdentity === event.pageIdentity;
+    return {
+      ...state,
+      ...common,
+      pendingNavigation: identityAlreadyRotated ? null : pending,
+      observedNavigationId: identityAlreadyRotated ? null : event.navigationId
+    };
+  }
+
+  if (event.eventType === 'NAVIGATION_CLEAR') {
+    return {
+      ...state,
+      ...common,
+      pendingNavigation: state.pendingNavigation?.navigationId === event.navigationId
+        ? null
+        : state.pendingNavigation,
+      observedNavigationId: state.observedNavigationId === event.navigationId
+        ? null
+        : state.observedNavigationId
+    };
+  }
+
+  if (event.eventType === 'PAGE_READY_RESUME_FAILED') {
+    return {
+      ...state,
+      ...common,
+      safeError: SAFE_RESPONSE_ERROR,
+      pendingNavigation: state.pendingNavigation?.navigationId === event.navigationId
+        ? null
+        : state.pendingNavigation,
+      observedNavigationId: state.observedNavigationId === event.navigationId
+        ? null
+        : state.observedNavigationId
+    };
+  }
+
   if (event.eventType === 'OVERLAY_TARGET') {
     if (state.pageIdentity !== event.pageIdentity) return state;
     if (isProtectedWorkflowStatus(state.workflowStatus) ||
@@ -99,7 +172,8 @@ function applyServerEvent(state: ConversationState, event: ConversationServerEve
   if (event.eventType === 'OVERLAY_CLEAR') {
     const matches = state.activeTarget?.targetId === event.targetId &&
       state.activeTarget.pageIdentity === event.pageIdentity &&
-      state.activeTarget.sourceSnapshotId === event.sourceSnapshotId;
+      state.activeTarget.sourceSnapshotId === event.sourceSnapshotId &&
+      state.activeTarget.locator?.publicTargetKey === event.publicTargetKey;
     return {
       ...state,
       ...common,
@@ -113,7 +187,8 @@ function applyServerEvent(state: ConversationState, event: ConversationServerEve
     const matches = state.pendingObservation?.requestId === event.requestId &&
       state.pendingObservation.targetId === event.targetId &&
       state.pendingObservation.pageIdentity === event.pageIdentity &&
-      state.pendingObservation.sourceSnapshotId === event.sourceSnapshotId;
+      state.pendingObservation.sourceSnapshotId === event.sourceSnapshotId &&
+      state.pendingObservation.publicTargetKey === event.publicTargetKey;
     return {
       ...state,
       ...common,
@@ -140,6 +215,8 @@ function applyServerEvent(state: ConversationState, event: ConversationServerEve
       activeTarget: protectedState ? null : state.activeTarget,
       observationPhase: protectedState ? 'IDLE' : state.observationPhase,
       pendingObservation: protectedState ? null : state.pendingObservation,
+      pendingNavigation: protectedState ? null : state.pendingNavigation,
+      observedNavigationId: protectedState ? null : state.observedNavigationId,
       submitPhase: protectedState ? 'IDLE' : 'WAITING_FOR_AI',
       pendingRequestId: protectedState ? null : state.pendingRequestId,
       pendingMessageId: protectedState ? null : state.pendingMessageId
@@ -162,6 +239,8 @@ function applyServerEvent(state: ConversationState, event: ConversationServerEve
     activeTarget: isProtectedWorkflowStatus(event.workflowStatus) ? null : state.activeTarget,
     observationPhase: isProtectedWorkflowStatus(event.workflowStatus) ? 'IDLE' : state.observationPhase,
     pendingObservation: isProtectedWorkflowStatus(event.workflowStatus) ? null : state.pendingObservation,
+    pendingNavigation: isProtectedWorkflowStatus(event.workflowStatus) ? null : state.pendingNavigation,
+    observedNavigationId: isProtectedWorkflowStatus(event.workflowStatus) ? null : state.observedNavigationId,
     submitPhase: 'IDLE',
     pendingRequestId: null,
     pendingMessageId: null
@@ -261,6 +340,8 @@ export function conversationReducer(state: ConversationState, action: Conversati
         activeTarget: isProtectedWorkflowStatus(snapshot.workflowStatus) ? null : state.activeTarget,
         observationPhase: isProtectedWorkflowStatus(snapshot.workflowStatus) ? 'IDLE' : state.observationPhase,
         pendingObservation: isProtectedWorkflowStatus(snapshot.workflowStatus) ? null : state.pendingObservation,
+        pendingNavigation: isProtectedWorkflowStatus(snapshot.workflowStatus) ? null : state.pendingNavigation,
+        observedNavigationId: isProtectedWorkflowStatus(snapshot.workflowStatus) ? null : state.observedNavigationId,
         workflowStatus: snapshot.workflowStatus,
         submitPhase: isProtectedWorkflowStatus(snapshot.workflowStatus)
           ? 'IDLE'
@@ -280,6 +361,22 @@ export function conversationReducer(state: ConversationState, action: Conversati
         observationPhase: 'IDLE',
         pendingObservation: null
       };
+    case 'PAGE_READY_ACKNOWLEDGED':
+      if (state.pendingNavigation?.navigationId !== action.navigationId ||
+          state.pendingNavigation.destinationPageIdentity !== action.pageIdentity) return state;
+      return {
+        ...state,
+        pageIdentity: action.pageIdentity,
+        pendingNavigation: state.observedNavigationId === action.navigationId
+          ? null
+          : state.pendingNavigation,
+        observedNavigationId: state.observedNavigationId === action.navigationId
+          ? null
+          : state.observedNavigationId,
+        activeTarget: null,
+        observationPhase: 'IDLE',
+        pendingObservation: null
+      };
     case 'OVERLAY_CLEARED_LOCAL':
       return {
         ...state,
@@ -292,7 +389,8 @@ export function conversationReducer(state: ConversationState, action: Conversati
           !state.activeTarget || state.observationPhase !== 'IDLE' ||
           state.activeTarget.targetId !== action.observation.targetId ||
           state.activeTarget.pageIdentity !== action.observation.pageIdentity ||
-          state.activeTarget.sourceSnapshotId !== action.observation.sourceSnapshotId) return state;
+          state.activeTarget.sourceSnapshotId !== action.observation.sourceSnapshotId ||
+          state.activeTarget.locator?.publicTargetKey !== action.observation.publicTargetKey) return state;
       return { ...state, observationPhase: 'SUBMITTING', pendingObservation: action.observation };
     case 'OBSERVATION_ACKNOWLEDGED':
       return state.pendingObservation?.requestId === action.requestId &&
@@ -304,7 +402,8 @@ export function conversationReducer(state: ConversationState, action: Conversati
         ? { ...state, observationPhase: 'ERROR', pendingObservation: null }
         : state;
     case 'PROTECTION_ENFORCED':
-      if (!state.activeTarget && !state.pendingObservation &&
+      if (!state.activeTarget && !state.pendingObservation && !state.pendingNavigation &&
+          !state.observedNavigationId &&
           state.observationPhase === 'IDLE' && !state.pendingRequestId &&
           !state.pendingMessageId && state.submitPhase === 'IDLE' &&
           (!action.clearDraft || !state.draft)) return state;
@@ -316,7 +415,9 @@ export function conversationReducer(state: ConversationState, action: Conversati
         pendingMessageId: null,
         activeTarget: null,
         observationPhase: 'IDLE',
-        pendingObservation: null
+        pendingObservation: null,
+        pendingNavigation: null,
+        observedNavigationId: null
       };
     case 'CONNECTION_CHANGED':
       return action.connectionPhase === 'CONNECTED' || action.connectionPhase === 'CONNECTING'
@@ -329,7 +430,9 @@ export function conversationReducer(state: ConversationState, action: Conversati
             pendingMessageId: null,
             activeTarget: null,
             observationPhase: 'IDLE',
-            pendingObservation: null
+            pendingObservation: null,
+            pendingNavigation: null,
+            observedNavigationId: null
           };
     case 'CONVERSATION_RESET':
       return createInitialConversationState(state.connectionPhase);

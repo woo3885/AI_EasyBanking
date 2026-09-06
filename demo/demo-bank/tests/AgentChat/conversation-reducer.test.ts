@@ -7,6 +7,7 @@ import {
   type AiMessageEvent,
   type AiQuestionEvent,
   type ConversationMessage,
+  type NavigationRequiredEvent,
   type ConversationSnapshot,
   type ConversationState
 } from '../../src/features/AgentChat/model/conversation-types';
@@ -41,6 +42,17 @@ function snapshot(overrides: Partial<ConversationSnapshot> = {}): ConversationSn
   return { snapshotId: 'snapshot-1', sessionId: 'session-1', eventSequence: 0, conversationSequence: 0,
     goalRevision: 0, userGoal: { goalId: 'goal-1' }, activeQuestion: null, recentSafeMessages: [],
     workflowStatus: 'SESSION_CREATED', expiresAt: '2026-09-01T01:00:00.000Z', ...overrides };
+}
+
+function navigationEvent(eventSequence = 3): NavigationRequiredEvent {
+  return {
+    eventId: `navigation-event-${eventSequence}`, eventSequence,
+    eventType: 'NAVIGATION_REQUIRED', sessionId: 'session-1', navigationId: 'navigation-1',
+    browserBindingId: 'binding-1', sourcePageIdentity: 'page-source',
+    destinationPageIdentity: 'page-destination', destinationRoute: '/deposit/products',
+    routeRevision: 1, navigationMode: 'SPA_PUSH', expiresAt: '2099-01-01T00:00:00Z',
+    guide: '예금 상품을 직접 선택해 주세요.', occurredAt: '2026-09-07T00:00:00Z'
+  };
 }
 
 describe('conversationReducer', () => {
@@ -154,6 +166,55 @@ describe('conversationReducer', () => {
     const failed = conversationReducer(submit(), { type: 'MESSAGE_SUBMIT_FAILED', requestId: 'request-1' });
     expect(failed.safeError).toBe(SAFE_MESSAGE_SUBMIT_ERROR);
   });
+
+  it('navigation 중에도 messages와 activeQuestion을 유지하고 destination identity를 원자적으로 적용한다', () => {
+    const question = conversationReducer({
+      ...withSession(), pageIdentity: 'page-source'
+    }, { type: 'SERVER_EVENT_RECEIVED', event: aiQuestion(2) });
+    const navigating = conversationReducer(question, {
+      type: 'SERVER_EVENT_RECEIVED', event: navigationEvent()
+    });
+    expect(navigating.pendingNavigation?.destinationRoute).toBe('/deposit/products');
+    expect(navigating.activeQuestion?.questionId).toBe('question-2');
+    expect(navigating.messages).toEqual(question.messages);
+
+    const acknowledged = conversationReducer(navigating, {
+      type: 'PAGE_READY_ACKNOWLEDGED', navigationId: 'navigation-1', pageIdentity: 'page-destination'
+    });
+    expect(acknowledged.pageIdentity).toBe('page-destination');
+    expect(acknowledged.activeQuestion?.questionId).toBe('question-2');
+  });
+
+  it('PAGE_READY_OBSERVED가 HTTP ACK보다 먼저 와도 destination identity 적용까지 pending navigation을 유지한다', () => {
+    const navigating = conversationReducer({ ...withSession(), pageIdentity: 'page-source' }, {
+      type: 'SERVER_EVENT_RECEIVED', event: navigationEvent()
+    });
+    const observed = conversationReducer(navigating, { type: 'SERVER_EVENT_RECEIVED', event: {
+      eventId: 'page-ready-event-4', eventSequence: 4, eventType: 'PAGE_READY_OBSERVED',
+      sessionId: 'session-1', navigationId: 'navigation-1', browserBindingId: 'binding-1',
+      sourcePageIdentity: 'page-source', pageIdentity: 'page-destination', routeRevision: 1,
+      occurredAt: '2026-09-07T00:00:01Z'
+    } });
+    expect(observed.pendingNavigation?.navigationId).toBe('navigation-1');
+    expect(observed.observedNavigationId).toBe('navigation-1');
+    const acknowledged = conversationReducer(observed, {
+      type: 'PAGE_READY_ACKNOWLEDGED', navigationId: 'navigation-1', pageIdentity: 'page-destination'
+    });
+    expect(acknowledged.pendingNavigation).toBeNull();
+    expect(acknowledged.observedNavigationId).toBeNull();
+  });
+
+  it.each(['SECURE_INPUT_REQUIRED', 'RISK_WARNING', 'FINAL_CONFIRMATION_REQUIRED'] as const)(
+    '%s 상태에서는 navigation pending을 만들지 않는다',
+    (workflowStatus) => {
+      const protectedState = { ...withSession(), pageIdentity: 'page-source', workflowStatus };
+      const result = conversationReducer(protectedState, {
+        type: 'SERVER_EVENT_RECEIVED', event: navigationEvent()
+      });
+      expect(result.pendingNavigation).toBeNull();
+      expect(result.pageIdentity).toBe('page-source');
+    }
+  );
 
   it('reset은 대화 상태를 지우고 연결 상태만 유지한다', () => {
     const state: ConversationState = { ...submit(), connectionPhase: 'CONNECTED' };

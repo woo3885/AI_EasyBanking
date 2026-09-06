@@ -1,10 +1,13 @@
 package com.ddd.backend.conversation.bridge;
 
 import com.ddd.backend.config.RestCorsProperties;
+import com.ddd.backend.domain.session.AutomationSessionRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.net.URI;
 import java.util.UUID;
 
 @Service
@@ -14,6 +17,7 @@ public final class UserBrowserBridgeService {
     private final UserBrowserBridgeRegistry browserBindings;
     private final DemoAgentBridgeProperties properties;
     private final RestCorsProperties cors;
+    private AutomationSessionRepository sessions;
 
     public UserBrowserBridgeService(
             DemoAgentBridgeRegistry playwrightBindings,
@@ -25,6 +29,11 @@ public final class UserBrowserBridgeService {
         this.browserBindings = browserBindings;
         this.properties = properties;
         this.cors = cors;
+    }
+
+    @Autowired(required = false)
+    void setSessions(AutomationSessionRepository sessions) {
+        this.sessions = sessions;
     }
 
     public UserBrowserBridgeBinding issue(String sessionId, String origin) {
@@ -43,10 +52,24 @@ public final class UserBrowserBridgeService {
                 "browser-binding-" + UUID.randomUUID(),
                 UUID.randomUUID().toString(),
                 "browser-page-" + UUID.randomUUID(),
+                currentRoute(sessionId),
                 origin,
                 Instant.now().plus(ttl));
         browserBindings.put(binding);
         return binding;
+    }
+
+    private String currentRoute(String sessionId) {
+        if (sessions == null) return null;
+        String currentUrl = sessions.findById(sessionId)
+                .map(session -> session.getCurrentUrl()).orElse(null);
+        if (currentUrl == null || currentUrl.isBlank()) return null;
+        try {
+            String path = URI.create(currentUrl).getPath();
+            return path == null || path.isBlank() ? "/" : path;
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalStateException("세션의 현재 URL을 route로 변환할 수 없습니다.");
+        }
     }
 
     /** Playwright bridge 기능이 꺼진 환경에서는 기존 세션 생성을 방해하지 않는다. */

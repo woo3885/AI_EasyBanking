@@ -14,7 +14,8 @@ final class DomSnapshotFingerprint {
                     .append('|').append(element.placeholder()).append('|').append(element.inputType())
                     .append('|').append(element.visible()).append('|').append(element.enabled())
                     .append('|').append(element.checked()).append('|').append(element.boundingBox())
-                    .append('|').append(element.securityPolicy());
+                    .append('|').append(element.securityPolicy())
+                    .append('|').append(element.publicTargetKey());
         }
         try {
             return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
