@@ -1,10 +1,10 @@
 import { useState } from 'react';
 
 import { useAgentConversation, type AgentChatSubmitRequest, type AgentConversationDependencies } from '../hooks/use-agent-conversation';
+import { useAgentPageProtection } from '../hooks/use-agent-page-protection';
 import { useAgentSpeechRecognition, useAgentSpeechSynthesis } from '../hooks/use-agent-speech';
 import { useDomTargetOverlay } from '../hooks/use-dom-target-overlay';
 import { CHAT_SENSITIVE_ERROR } from '../model/chat-message-policy';
-import { isConversationInteractionBlocked } from '../model/conversation-safety';
 import AgentChatPanel from './AgentChatPanel';
 import DomTargetOverlay from './DomTargetOverlay';
 import '../styles/agent-chat.css';
@@ -16,17 +16,20 @@ interface AgentChatShellProps extends Omit<AgentConversationDependencies, 'onSub
 export type { AgentChatSubmitRequest };
 
 export default function AgentChatShell(props: AgentChatShellProps) {
-  const { state, dispatch, submit, reconnect, clearOverlay, observeTarget } = useAgentConversation(props);
+  const pageProtection = useAgentPageProtection();
+  const { state, protection, dispatch, submit, reconnect, clearOverlay, observeTarget } = useAgentConversation({
+    ...props,
+    pageProtection
+  });
   const [isOpen, setIsOpen] = useState(true);
-  const blocked = isConversationInteractionBlocked(state);
   const speechRecognition = useAgentSpeechRecognition({
-    blocked,
+    blocked: !protection.canStartStt,
     onDraft: (draft) => dispatch({ type: 'DRAFT_CHANGED', draft }),
     onSensitive: () => dispatch({ type: 'SAFE_ERROR_SET', error: CHAT_SENSITIVE_ERROR })
   });
-  const speechSynthesis = useAgentSpeechSynthesis(blocked, state.sessionId);
+  const speechSynthesis = useAgentSpeechSynthesis(!protection.canPlayTts, state.sessionId);
   useDomTargetOverlay({
-    target: state.activeTarget,
+    target: protection.canShowOverlay ? state.activeTarget : null,
     observationPhase: state.observationPhase,
     onClear: clearOverlay,
     onTargetClick: observeTarget
@@ -56,7 +59,9 @@ export default function AgentChatShell(props: AgentChatShellProps) {
               submitPhase={state.submitPhase}
               connectionPhase={state.connectionPhase}
               safeError={state.safeError}
-              interactionBlocked={blocked}
+              interactionBlocked={!protection.canSubmitMessage}
+              interactionBlockedReason={protection.announcement}
+              canReconnect={protection.canReconnect}
               speechRecognition={speechRecognition}
               speechSynthesis={speechSynthesis}
               onReconnect={reconnect}
@@ -67,7 +72,7 @@ export default function AgentChatShell(props: AgentChatShellProps) {
           </div>
         ) : null}
       </aside>
-      {state.activeTarget ? (
+      {protection.canShowOverlay && state.activeTarget ? (
         <DomTargetOverlay target={state.activeTarget} observationPhase={state.observationPhase} />
       ) : null}
     </>

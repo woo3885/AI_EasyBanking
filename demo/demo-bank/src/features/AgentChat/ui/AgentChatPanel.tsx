@@ -18,6 +18,8 @@ export interface AgentChatPanelProps {
   onDismissError: () => void;
   connectionPhase?: ConversationConnectionPhase;
   interactionBlocked?: boolean;
+  interactionBlockedReason?: string | null;
+  canReconnect?: boolean;
   onReconnect?: () => void;
   speechRecognition?: {
     isSupported: boolean;
@@ -54,6 +56,8 @@ export default function AgentChatPanel({
   onDismissError,
   connectionPhase = 'DISCONNECTED',
   interactionBlocked = false,
+  interactionBlockedReason = null,
+  canReconnect = false,
   onReconnect,
   speechRecognition,
   speechSynthesis
@@ -79,6 +83,12 @@ export default function AgentChatPanel({
         대화 연결: {connectionPhase === 'CONNECTED' ? '연결됨' : connectionPhase === 'RECONNECTING' ? '다시 연결 중' : connectionPhase === 'CONNECTING' ? '연결 중' : '연결 전'}
       </p>
 
+      {interactionBlockedReason ? (
+        <p id="agent-protection-reason" className="agent-protection-notice" role="alert">
+          {interactionBlockedReason}
+        </p>
+      ) : null}
+
       <ConversationMessageList
         messages={messages}
         onSpeak={speechSynthesis?.speak}
@@ -102,7 +112,7 @@ export default function AgentChatPanel({
           onDismiss={onDismissError}
         />
       ) : null}
-      {(connectionPhase === 'RECONNECTING' || connectionPhase === 'ERROR') && onReconnect ? (
+      {canReconnect && onReconnect ? (
         <button type="button" className="agent-reconnect-button" onClick={onReconnect}>
           대화 다시 연결
         </button>
@@ -116,6 +126,7 @@ export default function AgentChatPanel({
               key={request}
               type="button"
               disabled={isPending || interactionBlocked}
+              aria-describedby={interactionBlockedReason ? 'agent-protection-reason' : undefined}
               onClick={() => onDraftChange(request)}
             >
               {request}
@@ -128,6 +139,7 @@ export default function AgentChatPanel({
         value={value}
         submitPhase={submitPhase}
         interactionBlocked={interactionBlocked}
+        interactionBlockedReason={interactionBlockedReason}
         speechRecognition={speechRecognition}
         onDraftChange={onDraftChange}
         onSubmit={onSubmit}

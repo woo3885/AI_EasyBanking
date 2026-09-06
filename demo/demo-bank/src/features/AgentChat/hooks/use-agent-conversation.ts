@@ -6,6 +6,10 @@ import { createConversationTransport, type ConversationTransport } from '../api/
 import { createOverlayHttpClient, type OverlayHttpClient } from '../api/overlay-http-client';
 import { readDemoAgentBridge } from '../api/overlay-contract';
 import { conversationReducer } from '../model/conversation-reducer';
+import {
+  getConversationProtectionPolicy,
+  type AgentPageProtection
+} from '../model/conversation-safety';
 import { createInitialConversationState, SAFE_CONNECTION_ERROR, SAFE_RESPONSE_ERROR, type ConversationAction, type ConversationMessage } from '../model/conversation-types';
 import type { DemoAgentBridgeBinding, PublicOverlayTarget } from '../model/overlay-types';
 
@@ -19,6 +23,7 @@ export interface AgentConversationDependencies {
   onSubmitRequest?: (request: AgentChatSubmitRequest) => void | Promise<void>;
   overlayHttpClient?: OverlayHttpClient;
   bridgeBinding?: DemoAgentBridgeBinding | null;
+  pageProtection?: AgentPageProtection;
 }
 
 function defaultId(prefix: string) {
@@ -43,6 +48,10 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
   const bootstrapAbort = useRef<AbortController | null>(null);
   const observationAbort = useRef<AbortController | null>(null);
   const bridgeRef = useRef<DemoAgentBridgeBinding | null>(null);
+  const pageProtectionRef = useRef<AgentPageProtection>('NONE');
+  const bridgeRecoveryGeneration = useRef(0);
+  const reconnectRecoveryPending = useRef(false);
+  const pendingInitialBridgeTarget = useRef<PublicOverlayTarget | null>(null);
   const transportRef = useRef<ConversationTransport | null>(null);
   const baseUrl = dependencies.backendBaseUrl ?? import.meta.env.VITE_BACKEND_BASE_URL ?? DEFAULT_CONVERSATION_API_BASE_URL;
   const httpClient = useMemo(() => dependencies.httpClient ?? createConversationHttpClient(baseUrl), [baseUrl, dependencies.httpClient]);
@@ -52,11 +61,55 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
   );
   const stompClient = useMemo(() => dependencies.stompClient ?? createNativeConversationStompClient(), [dependencies.stompClient]);
   const createId = dependencies.createId ?? defaultId;
+  const pageProtection = dependencies.pageProtection ?? 'NONE';
+  pageProtectionRef.current = pageProtection;
+  const protection = getConversationProtectionPolicy(state, pageProtection);
 
   const stopTransport = useCallback(() => {
     transportRef.current?.disconnect();
     transportRef.current = null;
   }, []);
+
+  const recoverBridge = useCallback(async (binding: DemoAgentBridgeBinding) => {
+    const generation = bridgeRecoveryGeneration.current + 1;
+    bridgeRecoveryGeneration.current = generation;
+    bootstrapAbort.current?.abort();
+    const controller = new AbortController();
+    bootstrapAbort.current = controller;
+    try {
+      const recovery = await overlayHttpClient.recoverBridge(
+        binding,
+        { width: window.innerWidth, height: window.innerHeight },
+        controller.signal
+      );
+      if (controller.signal.aborted || generation !== bridgeRecoveryGeneration.current) return null;
+      return recovery;
+    } catch (error) {
+      if (controller.signal.aborted || generation !== bridgeRecoveryGeneration.current) return null;
+      throw error;
+    } finally {
+      if (bootstrapAbort.current === controller) bootstrapAbort.current = null;
+    }
+  }, [overlayHttpClient]);
+
+  const restoreBridgeTarget = useCallback(async () => {
+    const binding = bridgeRef.current;
+    if (!binding) return;
+    try {
+      const recovery = await recoverBridge(binding);
+      if (!recovery || stateRef.current.sessionId !== recovery.sessionId ||
+          stateRef.current.pageIdentity !== recovery.pageIdentity) return;
+      const currentProtection = getConversationProtectionPolicy(stateRef.current, pageProtectionRef.current);
+      apply({
+        type: 'BRIDGE_RECOVERED',
+        pageIdentity: recovery.pageIdentity,
+        activeTarget: currentProtection.canRestoreOverlay ? recovery.activeTarget : null
+      });
+    } catch {
+      apply({ type: 'CONNECTION_CHANGED', connectionPhase: 'ERROR' });
+      apply({ type: 'SAFE_ERROR_SET', error: SAFE_CONNECTION_ERROR });
+    }
+  }, [apply, recoverBridge]);
 
   const startTransport = useCallback((sessionId: string, pageIdentity?: string) => {
     stopTransport();
@@ -67,9 +120,36 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
       webSocketUrl: toConversationWebSocketUrl(baseUrl),
       callbacks: {
         onConnected: () => apply({ type: 'CONNECTION_CHANGED', connectionPhase: 'CONNECTED' }),
-        onReconnecting: () => apply({ type: 'CONNECTION_CHANGED', connectionPhase: 'RECONNECTING' }),
-        onConnectionError: () => apply({ type: 'CONNECTION_CHANGED', connectionPhase: 'ERROR' }),
-        onSnapshot: (snapshot) => apply({ type: 'SNAPSHOT_RESTORED', snapshot }),
+        onReconnecting: () => {
+          pendingInitialBridgeTarget.current = null;
+          reconnectRecoveryPending.current = true;
+          apply({ type: 'CONNECTION_CHANGED', connectionPhase: 'RECONNECTING' });
+        },
+        onConnectionError: () => {
+          pendingInitialBridgeTarget.current = null;
+          apply({ type: 'CONNECTION_CHANGED', connectionPhase: 'ERROR' });
+        },
+        onSnapshot: (snapshot) => {
+          apply({ type: 'SNAPSHOT_RESTORED', snapshot });
+          if (reconnectRecoveryPending.current) {
+            reconnectRecoveryPending.current = false;
+            void restoreBridgeTarget();
+            return;
+          }
+          const initialTarget = pendingInitialBridgeTarget.current;
+          pendingInitialBridgeTarget.current = null;
+          const current = stateRef.current;
+          const currentProtection = getConversationProtectionPolicy(current, pageProtectionRef.current);
+          if (initialTarget && currentProtection.canRestoreOverlay &&
+              current.sessionId === initialTarget.sessionId &&
+              current.pageIdentity === initialTarget.pageIdentity) {
+            apply({
+              type: 'BRIDGE_RECOVERED',
+              pageIdentity: initialTarget.pageIdentity,
+              activeTarget: initialTarget
+            });
+          }
+        },
         onEvent: (event) => {
           const before = stateRef.current;
           apply({ type: 'SERVER_EVENT_RECEIVED', event });
@@ -82,7 +162,7 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
     });
     transportRef.current = transport;
     transport.start(sessionId, pageIdentity);
-  }, [apply, baseUrl, httpClient, stompClient, stopTransport]);
+  }, [apply, baseUrl, httpClient, restoreBridgeTarget, stompClient, stopTransport]);
 
   useEffect(() => {
     const injected = dependencies.bridgeBinding === undefined
@@ -91,40 +171,34 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
     if (!injected) return;
     let timer = window.setTimeout(() => {
       timer = 0;
-      const controller = new AbortController();
-      bootstrapAbort.current = controller;
-      void overlayHttpClient.recoverBridge(
-        injected,
-        { width: window.innerWidth, height: window.innerHeight },
-        controller.signal
-      ).then((recovery) => {
-        if (controller.signal.aborted) return;
+      void recoverBridge(injected).then((recovery) => {
+        if (!recovery) return;
         bridgeRef.current = injected;
         apply({ type: 'SESSION_ASSIGNED', sessionId: recovery.sessionId });
+        pendingInitialBridgeTarget.current = recovery.activeTarget;
         startTransport(recovery.sessionId, recovery.pageIdentity);
         apply({
           type: 'BRIDGE_RECOVERED',
           pageIdentity: recovery.pageIdentity,
-          activeTarget: recovery.activeTarget
+          activeTarget: null
         });
       }).catch(() => {
-        if (!controller.signal.aborted) {
-          apply({ type: 'CONNECTION_CHANGED', connectionPhase: 'ERROR' });
-          apply({ type: 'SAFE_ERROR_SET', error: SAFE_CONNECTION_ERROR });
-        }
-      }).finally(() => {
-        if (bootstrapAbort.current === controller) bootstrapAbort.current = null;
+        apply({ type: 'CONNECTION_CHANGED', connectionPhase: 'ERROR' });
+        apply({ type: 'SAFE_ERROR_SET', error: SAFE_CONNECTION_ERROR });
       });
     }, 0);
     return () => {
       if (timer) window.clearTimeout(timer);
       bootstrapAbort.current?.abort();
       bootstrapAbort.current = null;
+      bridgeRecoveryGeneration.current += 1;
+      pendingInitialBridgeTarget.current = null;
     };
-  }, [apply, dependencies.bridgeBinding, overlayHttpClient, startTransport]);
+  }, [apply, dependencies.bridgeBinding, recoverBridge, startTransport]);
 
   const submit = useCallback(async (content: string) => {
-    if (submitLock.current) return;
+    if (submitLock.current ||
+        !getConversationProtectionPolicy(stateRef.current, pageProtection).canSubmitMessage) return;
     submitLock.current = true;
     const requestId = createId('chat-request');
     const messageId = createId('chat-message');
@@ -169,7 +243,7 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
       if (requestAbort.current === controller) requestAbort.current = null;
       submitLock.current = false;
     }
-  }, [apply, createId, dependencies, httpClient, startTransport]);
+  }, [apply, createId, dependencies, httpClient, pageProtection, startTransport]);
 
   const clearOverlay = useCallback(() => {
     apply({ type: 'OVERLAY_CLEARED_LOCAL' });
@@ -178,7 +252,8 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
   const observeTarget = useCallback((target: PublicOverlayTarget) => {
     const current = stateRef.current;
     const bridge = bridgeRef.current;
-    if (!bridge || current.observationPhase !== 'IDLE' || !current.activeTarget ||
+    if (!getConversationProtectionPolicy(current, pageProtection).canObserveTarget ||
+        !bridge || current.observationPhase !== 'IDLE' || !current.activeTarget ||
         current.activeTarget.targetId !== target.targetId ||
         current.activeTarget.pageIdentity !== target.pageIdentity ||
         current.activeTarget.sourceSnapshotId !== target.sourceSnapshotId ||
@@ -213,22 +288,57 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
     }).finally(() => {
       if (observationAbort.current === controller) observationAbort.current = null;
     });
-  }, [apply, createId, overlayHttpClient]);
+  }, [apply, createId, overlayHttpClient, pageProtection]);
 
   const reconnect = useCallback(() => {
-    if (stateRef.current.sessionId) {
-      startTransport(stateRef.current.sessionId, stateRef.current.pageIdentity ?? undefined);
+    const current = stateRef.current;
+    if (current.sessionId && getConversationProtectionPolicy(current, pageProtection).canReconnect) {
+      reconnectRecoveryPending.current = true;
+      startTransport(current.sessionId, current.pageIdentity ?? undefined);
     }
     else apply({ type: 'SAFE_ERROR_SET', error: SAFE_CONNECTION_ERROR });
-  }, [apply, startTransport]);
+  }, [apply, pageProtection, startTransport]);
+
+  useEffect(() => {
+    if (protection.reason === 'NONE') return;
+    if (!protection.canRestoreOverlay) {
+      pendingInitialBridgeTarget.current = null;
+      bootstrapAbort.current?.abort();
+      bootstrapAbort.current = null;
+      bridgeRecoveryGeneration.current += 1;
+    }
+    requestAbort.current?.abort();
+    requestAbort.current = null;
+    submitLock.current = false;
+    observationAbort.current?.abort();
+    observationAbort.current = null;
+    apply({ type: 'PROTECTION_ENFORCED', clearDraft: protection.shouldClearDraft });
+    if (protection.shouldStopTransport) stopTransport();
+  }, [
+    apply,
+    protection.canRestoreOverlay,
+    protection.reason,
+    protection.shouldClearDraft,
+    protection.shouldStopTransport,
+    stopTransport
+  ]);
+
+  useEffect(() => {
+    if (state.pendingObservation === null) {
+      observationAbort.current?.abort();
+      observationAbort.current = null;
+    }
+  }, [state.pendingObservation]);
 
   useEffect(() => () => {
     requestAbort.current?.abort();
     bootstrapAbort.current?.abort();
     observationAbort.current?.abort();
+    bridgeRecoveryGeneration.current += 1;
+    reconnectRecoveryPending.current = false;
     bridgeRef.current = null;
     stopTransport();
   }, [stopTransport]);
 
-  return { state, dispatch: apply, submit, reconnect, clearOverlay, observeTarget };
+  return { state, protection, dispatch: apply, submit, reconnect, clearOverlay, observeTarget };
 }

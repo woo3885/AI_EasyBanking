@@ -38,12 +38,27 @@ export function useAgentSpeechRecognition(options: {
   onSensitive: () => void;
 }) {
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const blockedRef = useRef(options.blocked);
   const [isListening, setIsListening] = useState(false);
   const Constructor = typeof window === 'undefined' ? undefined : recognitionConstructor();
+
+  blockedRef.current = options.blocked;
 
   const stop = useCallback(() => {
     recognitionRef.current?.stop();
     recognitionRef.current = null;
+    setIsListening(false);
+  }, []);
+
+  const abort = useCallback(() => {
+    const recognition = recognitionRef.current;
+    recognitionRef.current = null;
+    if (recognition) {
+      recognition.onresult = null;
+      recognition.onend = null;
+      recognition.onerror = null;
+      recognition.abort();
+    }
     setIsListening(false);
   }, []);
 
@@ -54,15 +69,14 @@ export function useAgentSpeechRecognition(options: {
     recognition.interimResults = true;
     recognition.continuous = false;
     recognition.onresult = (event) => {
+      if (blockedRef.current || recognitionRef.current !== recognition) return;
       let draft = '';
       for (let index = 0; index < event.results.length; index += 1) {
         draft += event.results[index][0]?.transcript ?? '';
       }
       const validation = validateChatMessage(draft);
       if (validation.issues.includes('SENSITIVE_INFORMATION')) {
-        recognition.abort();
-        recognitionRef.current = null;
-        setIsListening(false);
+        abort();
         options.onDraft('');
         options.onSensitive();
         return;
@@ -70,6 +84,7 @@ export function useAgentSpeechRecognition(options: {
       options.onDraft(draft);
     };
     recognition.onend = () => {
+      if (recognitionRef.current !== recognition) return;
       recognitionRef.current = null;
       setIsListening(false);
     };
@@ -77,15 +92,21 @@ export function useAgentSpeechRecognition(options: {
     recognitionRef.current = recognition;
     setIsListening(true);
     recognition.start();
-  }, [Constructor, options]);
+  }, [Constructor, abort, options]);
 
   useEffect(() => {
-    if (options.blocked) stop();
-  }, [options.blocked, stop]);
+    if (options.blocked) abort();
+  }, [abort, options.blocked]);
 
   useEffect(() => () => {
-    recognitionRef.current?.abort();
+    const recognition = recognitionRef.current;
     recognitionRef.current = null;
+    if (recognition) {
+      recognition.onresult = null;
+      recognition.onend = null;
+      recognition.onerror = null;
+      recognition.abort();
+    }
   }, []);
 
   return { isSupported: Boolean(Constructor), isListening, start, stop };
