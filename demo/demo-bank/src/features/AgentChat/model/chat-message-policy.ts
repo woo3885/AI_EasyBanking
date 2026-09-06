@@ -22,7 +22,6 @@ export interface ChatMessagePolicyResult {
   safeError: string | null;
 }
 
-export const CHAT_EMPTY_ERROR = '안전한 업무 요청을 입력해 주세요.';
 export const CHAT_FORMAT_ERROR =
   '요청을 짧고 쉽게 정리해 다시 입력해 주세요.';
 export const CHAT_SENSITIVE_ERROR =
@@ -79,9 +78,7 @@ export function validateChatMessage(
     safeError = CHAT_SENSITIVE_ERROR;
   } else if (issues.includes('SUBMISSION_PENDING')) {
     safeError = CHAT_PENDING_ERROR;
-  } else if (issues.includes('EMPTY')) {
-    safeError = CHAT_EMPTY_ERROR;
-  } else if (issues.length > 0) {
+  } else if (issues.some((issue) => issue !== 'EMPTY')) {
     safeError = CHAT_FORMAT_ERROR;
   }
 

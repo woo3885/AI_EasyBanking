@@ -23,7 +23,6 @@ interface MessageComposerProps {
   };
 }
 
-const DESCRIPTION_ID = 'description-agent-message-policy';
 const VALIDATION_ID = 'status-agent-message-validation';
 
 export default function MessageComposer({
@@ -40,9 +39,14 @@ export default function MessageComposer({
     isSubmissionPending:
       isConversationSubmissionPending(submitPhase) || interactionBlocked
   });
-  const describedBy = `${DESCRIPTION_ID} ${VALIDATION_ID}${
-    interactionBlockedReason ? ' agent-protection-reason' : ''
-  }`;
+  const hasValidationMessage =
+    sensitiveInputBlocked || !validation.issues.includes('EMPTY');
+  const describedBy = [
+    hasValidationMessage ? VALIDATION_ID : null,
+    interactionBlockedReason ? 'agent-protection-reason' : null
+  ]
+    .filter(Boolean)
+    .join(' ') || undefined;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -81,9 +85,6 @@ export default function MessageComposer({
         onChange={(event) => handleDraftChange(event.currentTarget.value)}
         disabled={interactionBlocked}
       />
-      <p id={DESCRIPTION_ID} className="agent-composer-guide">
-        비밀번호, OTP, PIN, 인증번호는 입력하지 마세요.
-      </p>
       <div id={VALIDATION_ID}>
         {sensitiveInputBlocked ? (
           <SensitiveMessageWarning
@@ -96,7 +97,7 @@ export default function MessageComposer({
             message={validation.safeError}
             onDismiss={handleSensitiveWarningDismiss}
           />
-        ) : validation.safeError ? (
+        ) : validation.issues.includes('EMPTY') ? null : validation.safeError ? (
           <p className="agent-composer-validation">{validation.safeError}</p>
         ) : (
           <p className="agent-composer-ready">안전한 요청을 전송할 수 있습니다.</p>
