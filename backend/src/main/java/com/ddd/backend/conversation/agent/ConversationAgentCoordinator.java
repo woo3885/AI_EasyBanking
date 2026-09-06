@@ -16,6 +16,8 @@ import com.ddd.backend.conversation.gate.ConversationProtectedGateRegistry;
 import com.ddd.backend.conversation.overlay.OverlayTargetService;
 import com.ddd.backend.automation.dom.SanitizedDomSnapshot;
 import com.ddd.backend.conversation.navigation.ConversationNavigationAdapter;
+import com.ddd.backend.conversation.navigation.PageReadyResumeError;
+import com.ddd.backend.conversation.overlay.GuideUserMaterializationException;
 
 /** Day 1 ASK_USER orchestration. It never invokes Browser Action execution. */
 @Service
@@ -166,9 +168,14 @@ public final class ConversationAgentCoordinator {
         }
         if (decision.mode() == ConversationInteractionMode.GUIDE_USER) {
             if (overlayTargetService == null || snapshot == null) {
-                throw new IllegalStateException("GUIDE_USER Overlay target service가 준비되지 않았습니다.");
+                throw new GuideUserMaterializationException(
+                        PageReadyResumeError.GUIDE_USER_TARGET_MISSING);
             }
             var candidate = decision.actionCandidate();
+            if (candidate == null || !snapshot.snapshotId().equals(decision.sourceSnapshotId())) {
+                throw new GuideUserMaterializationException(
+                        PageReadyResumeError.GUIDE_USER_TARGET_INVALID);
+            }
             overlayTargetService.create(
                     sessionId, snapshot, candidate.targetElementId(), candidate.role(),
                     candidate.accessibleLabel(), candidate.guide());
