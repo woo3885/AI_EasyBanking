@@ -13,7 +13,7 @@ import {
   conversationSnapshot,
 } from "./fixtures/cD2Deposit.fixtures.js";
 
-test("C-D2-04 all nine interaction modes remain semantically distinct", async () => {
+test("C-D2-04 all ten interaction modes remain semantically distinct", async () => {
   const decisions = await Promise.all(
     C_D2_DEPOSIT_FIXTURES.map((fixture) =>
       new ScriptedConversationModel().decide(fixture.request)),
@@ -24,10 +24,14 @@ test("C-D2-04 all nine interaction modes remain semantically distinct", async ()
     "https://demo.test/deposit/completed/deposit-12m",
   ));
   decisions.push(decideConversationInteraction(completed));
+  const navigation = conversationRequest(conversationSnapshot("snap-navigation", []));
+  navigation.goal = { ...navigation.goal, stage: "DEPOSIT_ENTRY" };
+  decisions.push(decideConversationInteraction(navigation));
 
   assert.deepEqual(new Set(decisions.map((decision) => decision.mode)), new Set([
     "AUTO_EXECUTE",
     "GUIDE_USER",
+    "NAVIGATION_REQUIRED",
     "ASK_USER",
     "GOAL_PATCH_PROPOSED",
     "SECURE_INPUT_REQUIRED",

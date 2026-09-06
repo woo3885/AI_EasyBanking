@@ -28,12 +28,15 @@ import type {
   ConversationActionCandidate,
   ConversationActionType,
   ConversationAgentRequest,
+  SemanticNavigationRoute,
 } from "./conversationAgent.types.js";
 import { validateAgentDecision } from "./conversationAgent.validator.js";
+import { createNavigationDecisionId } from "./conversationNavigation.policy.js";
 
 const SNAPSHOT_MODES = new Set<AgentDecision["mode"]>([
   "AUTO_EXECUTE",
   "GUIDE_USER",
+  "NAVIGATION_REQUIRED",
   "SECURE_INPUT_REQUIRED",
   "RISK_WARNING",
   "FINAL_CONFIRMATION_REQUIRED",
@@ -87,6 +90,44 @@ function baseDecision(input: ConversationAgentRequest): AgentDecision {
     goalPatch: null,
     question: null,
     actionCandidate: null,
+    navigationCandidate: null,
+  };
+}
+
+function navigationRouteFor(
+  input: ConversationAgentRequest,
+  depositStage: ReturnType<typeof classifyDepositScenarioStage>,
+): SemanticNavigationRoute | null {
+  if (depositStage !== "UNKNOWN") return null;
+  if (input.goal.intent === "DEPOSIT" && input.goal.stage === "DEPOSIT_ENTRY") {
+    return "DEPOSIT_PRODUCTS";
+  }
+  if (input.goal.intent === "TRANSFER" && input.goal.stage === "TRANSFER_ENTRY") {
+    return "TRANSFER_ACCOUNTS";
+  }
+  return null;
+}
+
+function navigationDecision(
+  input: ConversationAgentRequest,
+  semanticRoute: SemanticNavigationRoute,
+): AgentDecision {
+  const base = baseDecision(input);
+  const navigationMode = "SPA_PUSH" as const;
+  return {
+    ...base,
+    mode: "NAVIGATION_REQUIRED",
+    message: semanticRoute === "DEPOSIT_PRODUCTS"
+      ? "예금 상품 화면으로 이동이 필요합니다."
+      : "이체 계좌 화면으로 이동이 필요합니다.",
+    reasonCode: "SEMANTIC_NAVIGATION_REQUIRED",
+    nextCondition: "PAGE_READY_REDECISION",
+    sourceSnapshotId: input.snapshot?.sourceSnapshotId ?? null,
+    navigationCandidate: {
+      decisionId: createNavigationDecisionId(input, semanticRoute, navigationMode),
+      semanticRoute,
+      navigationMode,
+    },
   };
 }
 
@@ -378,7 +419,15 @@ export function decideConversationInteraction(
     );
   }
 
+  if (hasVisiblePolicy(input, "BLOCKED") || containsUnverifiedFinalAction(input)) {
+    return { ...base, reasonCode: "BLOCKED_TARGET" };
+  }
+
   const stage = classifyDepositScenarioStage(actionRequest);
+  const navigationRoute = navigationRouteFor(input, stage);
+  if (navigationRoute !== null) {
+    return navigationDecision(input, navigationRoute);
+  }
   if (stage !== "UNKNOWN") {
     let protectedResponse: StructuredAIResponse;
     try {
@@ -430,10 +479,6 @@ export function decideConversationInteraction(
       message: protectedResponse.message,
       reasonCode: "UNSUPPORTED_INTERACTION",
     };
-  }
-
-  if (hasVisiblePolicy(input, "BLOCKED") || containsUnverifiedFinalAction(input)) {
-    return { ...base, reasonCode: "BLOCKED_TARGET" };
   }
 
   const userChoices = snapshot.sanitizedDomSnapshot.elements.filter(
@@ -545,6 +590,20 @@ export function validateConversationInteractionDecision(
     }
   }
 
+  if (decision.mode === "NAVIGATION_REQUIRED") {
+    const candidate = decision.navigationCandidate;
+    if (candidate) {
+      const expectedId = createNavigationDecisionId(
+        input,
+        candidate.semanticRoute,
+        candidate.navigationMode,
+      );
+      if (candidate.decisionId !== expectedId) {
+        errors.push("/navigationCandidate/decisionId must match canonical decision material");
+      }
+    }
+  }
+
   if (decision.mode === "ASK_USER") {
     const fieldKey = decision.question?.fieldKey;
     const missingInCurrentGoal = fieldKey
@@ -582,6 +641,12 @@ export function validateConversationInteractionDecision(
       JSON.stringify(decision.actionCandidate)
     ) {
       errors.push("/actionCandidate must match the current snapshot policy");
+    }
+    if (
+      JSON.stringify(expected.navigationCandidate) !==
+      JSON.stringify(decision.navigationCandidate)
+    ) {
+      errors.push("/navigationCandidate must match the current navigation policy");
     }
   }
 

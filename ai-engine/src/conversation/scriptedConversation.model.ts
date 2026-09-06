@@ -18,11 +18,16 @@ export class ScriptedConversationModel implements ConversationModelPort {
   async decide(input: ConversationAgentRequest): Promise<AgentDecision> {
     if (
       input.snapshot !== null &&
-      input.goal.intent === "DEPOSIT" &&
-      input.goal.amount !== null &&
-      input.goal.duration !== null &&
       input.goal.missingFields.length === 0 &&
-      input.goal.pendingQuestion === null
+      input.goal.pendingQuestion === null &&
+      (
+        (
+          input.goal.intent === "DEPOSIT" &&
+          input.goal.amount !== null &&
+          input.goal.duration !== null
+        ) ||
+        input.goal.stage === "TRANSFER_ENTRY"
+      )
     ) {
       return decideConversationInteraction(input);
     }
@@ -51,6 +56,7 @@ function baseDecision(
     goalPatch: null,
     question: null,
     actionCandidate: null,
+    navigationCandidate: null,
   };
 }
 

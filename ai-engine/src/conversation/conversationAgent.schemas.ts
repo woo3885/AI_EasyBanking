@@ -1,8 +1,10 @@
 import {
   AGENT_MODES,
+  BROWSER_NAVIGATION_MODES,
   CONVERSATION_ACTION_TYPES,
   GOAL_INTENTS,
   GOAL_STATUSES,
+  SEMANTIC_NAVIGATION_ROUTES,
 } from "./conversationAgent.types.js";
 
 const nonEmptyString = { type: "string", minLength: 1 } as const;
@@ -110,6 +112,7 @@ export const agentDecisionSchema = {
     "requestId", "requestMessageId", "goalId", "baseGoalRevision", "mode",
     "message", "confidence", "reasonCode", "nextCondition",
     "sourceSnapshotId", "goalPatch", "question", "actionCandidate",
+    "navigationCandidate",
   ],
   properties: {
     requestId: nonEmptyString,
@@ -152,6 +155,21 @@ export const agentDecisionSchema = {
             role: { type: "string", minLength: 1, maxLength: 32 },
             accessibleLabel: { type: "string", minLength: 1, maxLength: 120, pattern: "^[^\\r\\n]+$" },
             guide: { type: "string", minLength: 1, maxLength: 200, pattern: "^[^\\r\\n]+$" },
+          },
+        },
+      ],
+    },
+    navigationCandidate: {
+      anyOf: [
+        { type: "null" },
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["decisionId", "semanticRoute", "navigationMode"],
+          properties: {
+            decisionId: { type: "string", pattern: "^navdec_[a-f0-9]{64}$" },
+            semanticRoute: { enum: SEMANTIC_NAVIGATION_ROUTES },
+            navigationMode: { enum: BROWSER_NAVIGATION_MODES },
           },
         },
       ],
