@@ -27,6 +27,17 @@ function SpeechHarness({ blocked = false, sessionId = 'session-1' }: { blocked?:
 }
 
 describe('agent speech controls', () => {
+  it('STT 미지원 브라우저에는 음성 입력 control을 표시하지 않는다', () => {
+    render(<AgentChatShell onSubmitRequest={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: '음성 입력 시작' })).not.toBeInTheDocument();
+  });
+
+  it('보호 상태에서는 STT 시작을 실제 disabled 처리한다', () => {
+    render(<AgentChatPanel value="" messages={[]} submitPhase="IDLE" safeError={null}
+      interactionBlocked onDraftChange={vi.fn()} onSubmit={vi.fn()} onDismissError={vi.fn()}
+      speechRecognition={{ isSupported: true, isListening: false, start: vi.fn(), stop: vi.fn() }} />);
+    expect(screen.getByRole('button', { name: '음성 입력 시작' })).toBeDisabled();
+  });
   it('STT final 결과도 draft만 바꾸고 자동 전송하지 않는다', async () => {
     (window as typeof window & { webkitSpeechRecognition?: typeof FakeRecognition }).webkitSpeechRecognition = FakeRecognition;
     const user = userEvent.setup(); const onSubmitRequest = vi.fn();

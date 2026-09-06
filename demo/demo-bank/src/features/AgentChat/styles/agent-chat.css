@@ -279,6 +279,45 @@
   justify-self: end;
 }
 
+.dom-target-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.dom-target-highlight {
+  position: fixed;
+  box-sizing: border-box;
+  border: 4px solid #b54708;
+  border-radius: 12px;
+  box-shadow: 0 0 0 5px rgb(253 176 34 / 38%);
+  background: rgb(255 250 235 / 18%);
+}
+
+.dom-target-guide {
+  position: fixed;
+  display: grid;
+  width: min(320px, calc(100vw - 24px));
+  gap: 4px;
+  padding: 12px 14px;
+  border: 3px solid #b54708;
+  border-radius: 12px;
+  background: #fffaeb;
+  color: #7a2e0e;
+  box-shadow: 0 8px 18px rgb(16 24 40 / 18%);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.dom-target-guide strong {
+  font-size: 18px;
+}
+
+.dom-target-role {
+  font-weight: 700;
+}
+
 @media (max-width: 960px) {
   .demo-bank-agent-workspace {
     grid-template-columns: minmax(0, 1fr);

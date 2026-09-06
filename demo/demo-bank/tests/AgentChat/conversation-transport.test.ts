@@ -70,4 +70,41 @@ describe('conversation transport', () => {
     expect(onReconnecting).toHaveBeenCalledTimes(1);
     expect(getSnapshot).toHaveBeenCalledTimes(2);
   });
+
+  it('page identity와 viewport를 기준으로 live OVERLAY_TARGET을 전달한다', () => {
+    let handlers!: Parameters<ConversationStompClient['subscribe']>[0];
+    const onEvent = vi.fn();
+    const transport = createConversationTransport({
+      httpClient: { getSnapshot: vi.fn(), createSession: vi.fn(), sendMessage: vi.fn() } as unknown as ConversationHttpClient,
+      stompClient: { subscribe(value) { handlers = value; return { disconnect: vi.fn() }; } },
+      webSocketUrl: 'ws://127.0.0.1:8080/ws', callbacks: {
+        onConnected: vi.fn(), onReconnecting: vi.fn(), onSnapshot: vi.fn(), onEvent, onSafeError: vi.fn()
+      }
+    });
+    transport.start('session-1', 'page-1');
+    handlers.onMessage(JSON.stringify({ eventId: 'event-overlay', eventSequence: 3, eventType: 'OVERLAY_TARGET',
+      sessionId: 'session-1', workflowStatus: 'USER_DECISION_REQUIRED', targetId: 'target-1',
+      pageIdentity: 'page-1', sourceSnapshotId: 'snap-1', coordinateSpace: 'VIEWPORT_CSS_PX',
+      rectangle: { x: 10, y: 20, width: 100, height: 50 },
+      viewport: { width: window.innerWidth, height: window.innerHeight }, role: 'button', label: '상품 선택',
+      guide: '버튼을 직접 눌러 주세요.', actionMode: 'GUIDE_USER_CLICK',
+      expiresAt: '2099-01-01T00:00:00Z', occurredAt: '2026-09-06T12:00:00Z' }));
+    expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'OVERLAY_TARGET', targetId: 'target-1' }));
+  });
+
+  it('STOMP 오류를 connection ERROR callback으로 전달한다', () => {
+    let handlers!: Parameters<ConversationStompClient['subscribe']>[0];
+    const onConnectionError = vi.fn();
+    const transport = createConversationTransport({
+      httpClient: { getSnapshot: vi.fn(), createSession: vi.fn(), sendMessage: vi.fn() } as unknown as ConversationHttpClient,
+      stompClient: { subscribe(value) { handlers = value; return { disconnect: vi.fn() }; } },
+      webSocketUrl: 'ws://127.0.0.1:8080/ws', callbacks: {
+        onConnected: vi.fn(), onReconnecting: vi.fn(), onSnapshot: vi.fn(), onEvent: vi.fn(),
+        onSafeError: vi.fn(), onConnectionError
+      }
+    });
+    transport.start('session-1');
+    handlers.onError();
+    expect(onConnectionError).toHaveBeenCalledTimes(1);
+  });
 });

@@ -120,6 +120,7 @@ export default function MessageComposer({
         type="submit"
         className="agent-submit-button"
         disabled={sensitiveInputBlocked || interactionBlocked || !validation.isValid}
+        aria-describedby={`${DESCRIPTION_ID} ${VALIDATION_ID}`}
         aria-busy={submitPhase === 'SUBMITTING' ? 'true' : undefined}
       >
         {submitPhase === 'SUBMITTING' ? '전송 준비 중' : '요청 전송'}
