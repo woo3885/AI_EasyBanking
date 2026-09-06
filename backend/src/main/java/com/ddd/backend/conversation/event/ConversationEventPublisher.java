@@ -4,6 +4,7 @@ import java.time.Instant;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 import com.ddd.backend.domain.session.WorkflowStatus;
+import com.ddd.backend.conversation.overlay.*;
 
 @Component
 public final class ConversationEventPublisher {
@@ -30,6 +31,16 @@ public final class ConversationEventPublisher {
     public AiMessageEvent message(String sessionId, String messageId, long sequence,
             String text, long revision, WorkflowStatus status, String errorCode, Instant at) {
         return publish(store.message(sessionId, messageId, sequence, text, revision, status, errorCode, at));
+    }
+    public OverlayTargetEvent overlayTarget(PublicOverlayTarget target, Instant at) {
+        return publish(store.overlayTarget(target, at));
+    }
+    public OverlayClearEvent overlayClear(PublicOverlayTarget target, OverlayClearReason reason, Instant at) {
+        return publish(store.overlayClear(target, reason, at));
+    }
+    public UserActionObservedEvent userActionObserved(PublicOverlayTarget target,
+            String observationId, String requestId, String resultingSnapshotId, Instant at) {
+        return publish(store.userActionObserved(target, observationId, requestId, resultingSnapshotId, at));
     }
 
     private <T extends ConversationEvent> T publish(T event) {

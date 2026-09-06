@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.Set;
 import com.ddd.backend.security.secureinput.SecureInputRegistry;
 import com.ddd.backend.service.decision.SelectedDepositProductStore;
+import com.ddd.backend.conversation.overlay.OverlayTargetStore;
 
 @Service
 public final class SanitizedDomSnapshotService {
@@ -40,6 +41,7 @@ public final class SanitizedDomSnapshotService {
     private final ElementRegistry elementRegistry;
     private SecureInputRegistry secureInputRegistry;
     private SelectedDepositProductStore selectedProductStore;
+    private OverlayTargetStore overlayTargets;
 
     @Autowired
     void setSecureInputRegistry(SecureInputRegistry secureInputRegistry) {
@@ -51,6 +53,11 @@ public final class SanitizedDomSnapshotService {
             SelectedDepositProductStore selectedProductStore
     ) {
         this.selectedProductStore = selectedProductStore;
+    }
+
+    @Autowired(required = false)
+    void setOverlayTargets(OverlayTargetStore overlayTargets) {
+        this.overlayTargets = overlayTargets;
     }
 
     /*
@@ -326,6 +333,9 @@ public final class SanitizedDomSnapshotService {
                             page.url(),
                             registrations
                     );
+                    if (overlayTargets != null) {
+                        overlayTargets.clearIfSnapshotChanged(sessionId, snapshotId);
+                    }
 
                     return new SanitizedDomSnapshot(
                             SCHEMA_VERSION,
