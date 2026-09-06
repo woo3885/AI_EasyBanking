@@ -74,6 +74,7 @@ export interface UserGoalPatch {
 export const AGENT_MODES = [
   "AUTO_EXECUTE",
   "GUIDE_USER",
+  "NAVIGATION_REQUIRED",
   "ASK_USER",
   "SECURE_INPUT_REQUIRED",
   "RISK_WARNING",
@@ -93,6 +94,28 @@ export const CONVERSATION_ACTION_TYPES = [
 
 export type ConversationActionType =
   (typeof CONVERSATION_ACTION_TYPES)[number];
+
+export const SEMANTIC_NAVIGATION_ROUTES = [
+  "DEPOSIT_PRODUCTS",
+  "TRANSFER_ACCOUNTS",
+] as const;
+
+export type SemanticNavigationRoute =
+  (typeof SEMANTIC_NAVIGATION_ROUTES)[number];
+
+export const BROWSER_NAVIGATION_MODES = [
+  "SPA_PUSH",
+  "SPA_REPLACE",
+] as const;
+
+export type BrowserNavigationMode =
+  (typeof BROWSER_NAVIGATION_MODES)[number];
+
+export interface ConversationNavigationCandidate {
+  decisionId: string;
+  semanticRoute: SemanticNavigationRoute;
+  navigationMode: BrowserNavigationMode;
+}
 
 /**
  * B↔C internal target reference. Backend must revalidate elementId against
@@ -120,6 +143,7 @@ export interface AgentDecision {
   goalPatch: UserGoalPatch | null;
   question: { fieldKey: string } | null;
   actionCandidate: ConversationActionCandidate | null;
+  navigationCandidate: ConversationNavigationCandidate | null;
 }
 
 export interface ConversationAgentRequest {

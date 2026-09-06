@@ -100,6 +100,17 @@ export function validateAgentDecision(
     errors.push("/message must be non-null unless mode is GOAL_PATCH_PROPOSED");
   }
 
+  if (decision.mode === "NAVIGATION_REQUIRED") {
+    if (decision.navigationCandidate === null) {
+      errors.push("/navigationCandidate is required for NAVIGATION_REQUIRED");
+    }
+    if (decision.actionCandidate !== null) {
+      errors.push("/actionCandidate must be null for NAVIGATION_REQUIRED");
+    }
+  } else if (decision.navigationCandidate !== null) {
+    errors.push(`/navigationCandidate must be null for ${decision.mode}`);
+  }
+
   if (decision.mode === "GOAL_PATCH_PROPOSED") {
     // Mode-specific null checks are handled above.
   } else if (decision.mode === "ASK_USER") {
