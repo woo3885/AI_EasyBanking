@@ -54,7 +54,6 @@ export default function AgentChatPanel({
   onDraftChange,
   onSubmit,
   onDismissError,
-  connectionPhase = 'DISCONNECTED',
   interactionBlocked = false,
   interactionBlockedReason = null,
   canReconnect = false,
@@ -73,15 +72,7 @@ export default function AgentChatPanel({
       <div className="agent-chat-heading">
         <p className="agent-chat-kicker">대화형 AI 연결</p>
         <h2 id="agent-chat-title">AI 금융 도우미</h2>
-        <p>
-          원하는 업무를 입력하면 AI가 필요한 정보를 질문하는
-          구조입니다.
-        </p>
       </div>
-
-      <p className="agent-connection-status" aria-live="polite">
-        대화 연결: {connectionPhase === 'CONNECTED' ? '연결됨' : connectionPhase === 'RECONNECTING' ? '다시 연결 중' : connectionPhase === 'CONNECTING' ? '연결 중' : '연결 전'}
-      </p>
 
       {interactionBlockedReason ? (
         <p id="agent-protection-reason" className="agent-protection-notice" role="alert">
