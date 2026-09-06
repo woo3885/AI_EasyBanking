@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import com.ddd.backend.conversation.event.ConversationEventPublisher;
 import com.ddd.backend.conversation.overlay.OverlayClearReason;
 import com.ddd.backend.conversation.overlay.OverlayTargetStore;
+import com.ddd.backend.conversation.gate.ConversationProtectedGateRegistry;
 
 /** Day 1 ASK_USER orchestration. It never invokes Browser Action execution. */
 @Service
@@ -24,6 +25,7 @@ public final class ConversationAgentCoordinator {
     private final ConversationEventPublisher events;
     private ConversationAgentDomDecisionService domDecisionService;
     private OverlayTargetStore overlayTargets;
+    private ConversationProtectedGateRegistry protectedGates;
 
     public ConversationAgentCoordinator(ConversationService conversations, SessionMessageMailbox mailbox,
             AutomationSessionRepository sessions, ConversationAgentClient client,
@@ -40,6 +42,11 @@ public final class ConversationAgentCoordinator {
     @Autowired(required = false)
     void setOverlayTargets(OverlayTargetStore overlayTargets) {
         this.overlayTargets = overlayTargets;
+    }
+
+    @Autowired(required = false)
+    void setProtectedGates(ConversationProtectedGateRegistry protectedGates) {
+        this.protectedGates = protectedGates;
     }
 
     public ConversationAgentDecision process(String sessionId, MessageAcceptance acceptance,
@@ -120,6 +127,11 @@ public final class ConversationAgentCoordinator {
                 default -> null;
             };
             if (reason != null) overlayTargets.clear(sessionId, reason);
+        }
+        if (protectedGates != null && (decision.mode() == ConversationInteractionMode.SECURE_INPUT_REQUIRED
+                || decision.mode() == ConversationInteractionMode.RISK_WARNING
+                || decision.mode() == ConversationInteractionMode.FINAL_CONFIRMATION_REQUIRED)) {
+            protectedGates.activate(sessionId, decision);
         }
         session.transitionTo(status);
         sessions.save(session);

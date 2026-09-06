@@ -13,6 +13,9 @@ import com.ddd.backend.conversation.event.ConversationEventStore;
 import com.ddd.backend.domain.session.AutomationSession;
 import com.ddd.backend.domain.session.WorkflowStatus;
 import com.ddd.backend.infrastructure.session.InMemoryAutomationSessionRepository;
+import com.ddd.backend.conversation.gate.ConversationProtectedGateRegistry;
+import com.ddd.backend.conversation.agent.ConversationAgentDecision;
+import com.ddd.backend.conversation.agent.ConversationInteractionMode;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import org.junit.jupiter.api.Test;
@@ -55,7 +58,7 @@ class InteractionObservationServiceTest {
         when(snapshots.createSnapshot("session-1")).thenReturn(resulting);
         DemoAgentBridgeRegistry bridges = new DemoAgentBridgeRegistry();
         bridges.put(new DemoAgentBridgeBinding("session-1", "secret", "page-1",
-                "http://127.0.0.1:5190", NOW.plusSeconds(300)));
+                "http://127.0.0.1:5190", Instant.now().plusSeconds(300)));
         OverlayTargetStore targets = new OverlayTargetStore(Duration.ofMinutes(2), Clock.fixed(NOW, ZoneOffset.UTC));
         PublicOverlayTarget target = target();
         var eventStore = new ConversationEventStore();
@@ -93,6 +96,38 @@ class InteractionObservationServiceTest {
                 .isInstanceOfSatisfying(OverlayTargetException.class,
                         error -> assertThat(error.error()).isEqualTo(OverlayTargetError.OBSERVATION_DUPLICATE_REQUEST));
         verify(resume, times(1)).resumeOnce(anyString(), any(), any());
+    }
+
+    @Test
+    void 보호_gate가_활성화되면_workflow상태와_무관하게_observation을_차단한다() {
+        DemoAgentBridgeRegistry bridges = new DemoAgentBridgeRegistry();
+        bridges.put(new DemoAgentBridgeBinding("session-1", "secret", "page-1",
+                "http://127.0.0.1:5190", Instant.now().plusSeconds(300)));
+        OverlayTargetStore targets = mock(OverlayTargetStore.class);
+        var sessions = new InMemoryAutomationSessionRepository();
+        AutomationSession session = AutomationSession.restore(
+                "session-1", "예금 가입", WorkflowStatus.USER_DECISION_REQUIRED,
+                NOW, NOW, null, NOW);
+        sessions.save(session);
+        @SuppressWarnings("unchecked") ObjectProvider<ConversationObservationResumePort> provider = mock(ObjectProvider.class);
+        var service = new InteractionObservationService(bridges, targets,
+                mock(BrowserSessionManager.class), mock(ElementRegistry.class),
+                mock(SanitizedDomSnapshotService.class), sessions,
+                mock(ConversationEventPublisher.class), provider);
+        ConversationProtectedGateRegistry gates = new ConversationProtectedGateRegistry();
+        gates.activate("session-1", new ConversationAgentDecision(
+                "request-0", "message-0", "goal-1", 1,
+                ConversationInteractionMode.RISK_WARNING, "위험 확인이 필요합니다.",
+                1.0, "RISK", null, "snap-0", null, null, null));
+        service.setProtectedGates(gates);
+        var request = new InteractionObservationRequest(
+                "request-1", "target-1", "snap-1", "USER_CLICK", NOW);
+
+        assertThatThrownBy(() -> service.observe("session-1", "secret", "page-1",
+                "http://127.0.0.1:5190", request))
+                .isInstanceOfSatisfying(OverlayTargetException.class,
+                        error -> assertThat(error.error()).isEqualTo(OverlayTargetError.TARGET_NOT_INTERACTABLE));
+        verifyNoInteractions(targets);
     }
 
     private PublicOverlayTarget target() {
