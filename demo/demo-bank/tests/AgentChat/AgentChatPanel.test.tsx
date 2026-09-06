@@ -102,14 +102,9 @@ describe('AgentChatPanel', () => {
     const textarea = screen.getByRole('textbox', { name: '업무 요청' });
     const submitButton = screen.getByRole('button', { name: '요청 전송' });
 
-    expect(textarea).toHaveAttribute(
-      'aria-describedby',
-      'description-agent-message-policy status-agent-message-validation'
-    );
+    expect(textarea).not.toHaveAttribute('aria-describedby');
     expect(submitButton).toBeDisabled();
-    expect(
-      screen.getByText('안전한 업무 요청을 입력해 주세요.')
-    ).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('빠른 요청은 draft만 바꾸고 자동 전송하지 않는다', async () => {
@@ -227,11 +222,13 @@ describe('AgentChatPanel', () => {
     expect(screen.getByRole('button', { name: '요청 전송' })).toBeDisabled();
   });
 
-  it('전송 버튼 disabled 이유를 안내 문구와 직접 연결한다', () => {
-    render(<AgentChatPanel value="" messages={[]} submitPhase="IDLE" safeError={null}
+  it('입력 완료 상태를 전송 버튼의 안내 문구와 직접 연결한다', () => {
+    render(<AgentChatPanel value="예금 상품을 알아봐 줘" messages={[]} submitPhase="IDLE" safeError={null}
       onDraftChange={vi.fn()} onSubmit={vi.fn()} onDismissError={vi.fn()} />);
     expect(screen.getByRole('button', { name: '요청 전송' }))
-      .toHaveAttribute('aria-describedby', 'description-agent-message-policy status-agent-message-validation');
+      .toHaveAttribute('aria-describedby', 'status-agent-message-validation');
+    expect(screen.getByText('안전한 요청을 전송할 수 있습니다.'))
+      .toBeInTheDocument();
   });
 
   it('실제 Demo Bank 페이지와 채팅 shell을 동일 레이아웃에 렌더링한다', () => {

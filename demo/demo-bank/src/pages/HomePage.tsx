@@ -26,7 +26,6 @@ export default function HomePage() {
             {...elementIdentity(ELEMENT_IDS.BUTTON_START_DEPOSIT)}
             type="button"
             className="primary-button"
-            aria-describedby={ELEMENT_IDS.STATUS_HOME_STATIC}
             onClick={() => window.location.assign(ROUTES.DEPOSIT_PRODUCTS)}
           >
             예금 가입 시작
@@ -44,34 +43,12 @@ export default function HomePage() {
             {...elementIdentity(ELEMENT_IDS.BUTTON_START_TRANSFER)}
             type="button"
             className="primary-button"
-            aria-describedby={ELEMENT_IDS.STATUS_HOME_STATIC}
             onClick={() => window.location.assign(ROUTES.TRANSFER_ACCOUNTS)}
           >
             계좌이체 시작
           </button>
         </section>
       </div>
-
-      <p
-        {...elementIdentity(ELEMENT_IDS.STATUS_HOME_STATIC)}
-        className="static-notice"
-        role="status"
-      >
-        업무를 선택하면 첫 화면으로 이동합니다. 실제 금융거래는
-        발생하지 않습니다.
-      </p>
-
-      <aside className="warning-box" aria-label="보이스피싱 위험 요청 주의">
-        <h2>보이스피싱 위험 요청에 주의하세요</h2>
-        <p>
-          기관 사칭이나 안전계좌 송금을 요구받으면 금융 업무를 중단하고
-          공식 연락처를 직접 확인하세요.
-        </p>
-      </aside>
-
-      <p className="no-transaction-notice">
-        이 데모에서는 실제 예금 가입이나 계좌이체가 일어나지 않습니다.
-      </p>
     </DemoBankLayout>
   );
 }

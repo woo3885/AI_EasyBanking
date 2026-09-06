@@ -37,17 +37,6 @@
   cursor: pointer;
 }
 
-.agent-connection-status {
-  margin: 16px 0 0;
-  padding: 10px 12px;
-  border: 2px solid #667085;
-  border-radius: 10px;
-  background: #f8fafc;
-  color: #1d2939;
-  font-size: 16px;
-  font-weight: 700;
-}
-
 .agent-protection-notice {
   padding: 12px 14px;
   border: 2px solid #b42318;
@@ -109,7 +98,6 @@
 .agent-empty-message,
 .agent-submit-status,
 .agent-message-warning p,
-.agent-composer-guide,
 .agent-composer-validation,
 .agent-composer-ready,
 .agent-quick-requests p {
@@ -121,10 +109,8 @@
   font-size: 28px;
 }
 
-.agent-chat-heading > p:last-child,
 .agent-empty-message,
 .agent-message p,
-.agent-composer-guide,
 .agent-composer-validation,
 .agent-composer-ready,
 .agent-quick-requests p {
