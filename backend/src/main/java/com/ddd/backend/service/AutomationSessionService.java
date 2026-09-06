@@ -22,6 +22,7 @@ import com.ddd.backend.conversation.ConversationService;
 import com.ddd.backend.conversation.bridge.DemoAgentBridgeService;
 import com.ddd.backend.conversation.bridge.UserBrowserBridgeRegistry;
 import com.ddd.backend.conversation.navigation.BrowserNavigationService;
+import com.ddd.backend.conversation.navigation.NavigationDecisionRegistry;
 import com.ddd.backend.conversation.overlay.OverlayTargetStore;
 import com.ddd.backend.conversation.gate.ConversationProtectedGateRegistry;
 import com.ddd.backend.conversation.overlay.ConversationObservationResumeAdapter;
@@ -76,6 +77,7 @@ public class AutomationSessionService {
     private DemoAgentBridgeService demoAgentBridgeService;
     private UserBrowserBridgeRegistry userBrowserBridgeRegistry;
     private BrowserNavigationService browserNavigationService;
+    private NavigationDecisionRegistry navigationDecisions;
     private OverlayTargetStore overlayTargets;
     private ConversationProtectedGateRegistry conversationProtectedGates;
     private ConversationObservationResumeAdapter conversationObservationResumeAdapter;
@@ -103,6 +105,11 @@ public class AutomationSessionService {
     @Autowired(required = false)
     void setBrowserNavigationService(BrowserNavigationService service) {
         this.browserNavigationService = service;
+    }
+
+    @Autowired(required = false)
+    void setNavigationDecisions(NavigationDecisionRegistry navigationDecisions) {
+        this.navigationDecisions = navigationDecisions;
     }
 
     @Autowired(required = false)
@@ -742,6 +749,7 @@ public class AutomationSessionService {
             if (demoAgentBridgeService != null) demoAgentBridgeService.removeSession(sessionId);
             if (userBrowserBridgeRegistry != null) userBrowserBridgeRegistry.removeSession(sessionId);
             if (browserNavigationService != null) browserNavigationService.removeSession(sessionId);
+            if (navigationDecisions != null) navigationDecisions.removeSession(sessionId);
         } catch (RuntimeException ignored) {
             // Bridge cleanup failure must not block session cleanup.
         }

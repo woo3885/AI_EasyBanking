@@ -3,6 +3,8 @@ package com.ddd.backend.conversation.agent;
 import com.ddd.backend.conversation.ConversationMessagePolicy;
 import com.ddd.backend.conversation.goal.UserGoalAuthority;
 import com.ddd.backend.conversation.goal.UserGoalPatch;
+import com.ddd.backend.conversation.navigation.BrowserNavigationMode;
+import com.ddd.backend.conversation.navigation.BrowserSemanticRoute;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -110,6 +112,31 @@ class ConversationAgentContractValidatorTest {
         assertThatThrownBy(() -> validator.validate(request, invalid))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("GOAL_PATCH_PROPOSED");
+    }
+
+    @Test
+    void navigation_required는_selector나_url이_아닌_semantic_route만_허용한다() {
+        var request = request(new ConversationAgentRequest.SnapshotContext(
+                "snap-1", "page-1", null));
+        var valid = new ConversationAgentDecision(
+                "req-1", "msg-1", request.goal().goalId(), 0,
+                ConversationInteractionMode.NAVIGATION_REQUIRED,
+                "예금 상품 화면으로 이동합니다.", 0.95, "ROUTE_REQUIRED", "PAGE_READY",
+                "snap-1", null, null, null,
+                "decision-nav-1", new ConversationAgentDecision.NavigationCandidate(
+                        BrowserSemanticRoute.DEPOSIT_PRODUCTS, BrowserNavigationMode.SPA_PUSH));
+
+        assertThat(validator.validate(request, valid)).isSameAs(valid);
+
+        var missingDecisionIdentity = new ConversationAgentDecision(
+                "req-1", "msg-1", request.goal().goalId(), 0,
+                ConversationInteractionMode.NAVIGATION_REQUIRED,
+                "이동합니다.", 0.95, "ROUTE_REQUIRED", "PAGE_READY",
+                "snap-1", null, null, null,
+                null, valid.navigationCandidate());
+        assertThatThrownBy(() -> validator.validate(request, missingDecisionIdentity))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("structured navigationCandidate");
     }
 
     private ConversationAgentRequest request(

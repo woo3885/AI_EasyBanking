@@ -7,6 +7,7 @@ import java.util.*;
 public final class ConversationAgentContractValidator {
     private static final Set<ConversationInteractionMode> SNAPSHOT_REQUIRED = EnumSet.of(
             ConversationInteractionMode.AUTO_EXECUTE, ConversationInteractionMode.GUIDE_USER,
+            ConversationInteractionMode.NAVIGATION_REQUIRED,
             ConversationInteractionMode.SECURE_INPUT_REQUIRED, ConversationInteractionMode.RISK_WARNING,
             ConversationInteractionMode.FINAL_CONFIRMATION_REQUIRED, ConversationInteractionMode.COMPLETE);
     private final ConversationMessagePolicy messagePolicy;
@@ -58,6 +59,16 @@ public final class ConversationAgentContractValidator {
                     || candidate.guide().length() > 200) {
                 throw new IllegalArgumentException("GUIDE_USER requires a sanitized semantic target");
             }
+        }
+        if (decision.mode() == ConversationInteractionMode.NAVIGATION_REQUIRED) {
+            if (blank(decision.decisionId()) || decision.navigationCandidate() == null
+                    || decision.navigationCandidate().semanticRoute() == null
+                    || decision.navigationCandidate().navigationMode() == null
+                    || decision.actionCandidate() != null || decision.question() != null) {
+                throw new IllegalArgumentException("NAVIGATION_REQUIRED requires a structured navigationCandidate");
+            }
+        } else if (decision.navigationCandidate() != null || decision.decisionId() != null) {
+            throw new IllegalArgumentException("Navigation identity is only allowed for NAVIGATION_REQUIRED");
         }
         if ((decision.mode() == ConversationInteractionMode.SECURE_INPUT_REQUIRED
                 || decision.mode() == ConversationInteractionMode.RISK_WARNING

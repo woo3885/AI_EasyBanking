@@ -76,6 +76,12 @@ public final class ConversationState {
     public synchronized long sequence() { return sequence; }
     public synchronized long goalRevision() { return goalAuthority.snapshot().revision(); }
     public synchronized UserGoal goal() { return goalAuthority.snapshot(); }
+    public synchronized ConversationMessage requireMessage(String messageId) {
+        return messages.stream()
+                .filter(message -> message.messageId().equals(messageId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Conversation message not found"));
+    }
     public synchronized MessageAcceptance duplicateAcceptance(String requestId, String messageId) {
         MessageAcceptance value = acceptedRequests.get(requestId);
         if (value == null) return null;
