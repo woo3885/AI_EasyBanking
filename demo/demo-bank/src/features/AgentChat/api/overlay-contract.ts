@@ -2,7 +2,9 @@ import type {
   ConversationBridgeRecovery,
   DemoAgentBridgeBinding,
   InteractionObservationAccepted,
-  PublicOverlayTarget
+  OverlayMaterializationMode,
+  PublicOverlayTarget,
+  PublicTargetLocator
 } from '../model/overlay-types';
 import type {
   OverlayClearEvent,
@@ -20,12 +22,18 @@ const CLEAR_REASONS = new Set([
 const CONTROL_OR_HTML = /[\u0000-\u001F\u007F<>]/u;
 const RAW_ACCOUNT_NUMBER = /\b\d{2,4}-\d{2,6}-\d{2,6}\b/u;
 const RAW_CREDENTIAL = /(?:비밀번호|password|otp|pin|인증\s*(?:번호|코드))\s*[:=]\s*\S+/iu;
+const PROTOCOL_IDENTIFIER = /^[A-Za-z0-9._:-]+$/u;
+const PUBLIC_TARGET_KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+const FORBIDDEN_PUBLIC_TARGET_TOKENS = new Set([
+  'session', 'element', 'selector', 'xpath', 'password', 'otp', 'pin', 'token'
+]);
 
 export interface OverlayParseContext {
   sessionId: string;
   pageIdentity: string;
   viewport: { width: number; height: number };
   now?: number;
+  materializationMode?: OverlayMaterializationMode;
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -40,14 +48,23 @@ function exactKeys(value: Record<string, unknown>, keys: readonly string[]) {
     keys.every((key) => Object.prototype.hasOwnProperty.call(value, key));
 }
 
-function safeText(value: unknown, max: number): value is string {
+/** User-facing text policy. Protocol identifiers intentionally do not use this policy. */
+function safeUserText(value: unknown, max: number): value is string {
   return typeof value === 'string' && value.trim() === value && value.length > 0 &&
     Array.from(value).length <= max && !CONTROL_OR_HTML.test(value) &&
     !RAW_ACCOUNT_NUMBER.test(value) && !RAW_CREDENTIAL.test(value);
 }
 
-function safeId(value: unknown): value is string {
-  return safeText(value, 128) && /^[A-Za-z0-9._:-]+$/u.test(value);
+/** Syntax-only validation for opaque protocol identities such as UUIDs. */
+export function isProtocolIdentifier(value: unknown, max = 128): value is string {
+  return typeof value === 'string' && value.trim() === value && value.length > 0 &&
+    Array.from(value).length <= max && PROTOCOL_IDENTIFIER.test(value);
+}
+
+export function isPublicTargetKey(value: unknown): value is string {
+  if (typeof value !== 'string' || Array.from(value).length > 96 ||
+      !PUBLIC_TARGET_KEY.test(value)) return false;
+  return value.split('-').every((token) => !FORBIDDEN_PUBLIC_TARGET_TOKENS.has(token));
 }
 
 function finite(value: unknown): value is number {
@@ -60,8 +77,8 @@ function timestamp(value: unknown): value is string {
 }
 
 function eventIdentity(item: Record<string, unknown>) {
-  return safeId(item.eventId) && Number.isSafeInteger(item.eventSequence) &&
-    Number(item.eventSequence) > 0 && safeId(item.sessionId) && timestamp(item.occurredAt);
+  return isProtocolIdentifier(item.eventId) && Number.isSafeInteger(item.eventSequence) &&
+    Number(item.eventSequence) > 0 && isProtocolIdentifier(item.sessionId) && timestamp(item.occurredAt);
 }
 
 function parseRectangle(value: unknown) {
@@ -79,7 +96,16 @@ function parseViewport(value: unknown) {
   return { width: item.width, height: item.height };
 }
 
-function targetGeometryIsValid(target: PublicOverlayTarget, context: OverlayParseContext) {
+function parsePublicTargetLocator(value: unknown): PublicTargetLocator | null {
+  const item = record(value);
+  if (!item || !exactKeys(item, ['type', 'publicTargetKey', 'role', 'accessibleName']) ||
+      item.type !== 'PUBLIC_TARGET_KEY' || !isPublicTargetKey(item.publicTargetKey) ||
+      typeof item.role !== 'string' || !TARGET_ROLES.has(item.role) ||
+      !safeUserText(item.accessibleName, 120)) return null;
+  return item as unknown as PublicTargetLocator;
+}
+
+function legacyGeometryIsValid(target: PublicOverlayTarget, context: OverlayParseContext) {
   const { rectangle, viewport } = target;
   return Math.abs(viewport.width - context.viewport.width) <= 1 &&
     Math.abs(viewport.height - context.viewport.height) <= 1 &&
@@ -87,66 +113,89 @@ function targetGeometryIsValid(target: PublicOverlayTarget, context: OverlayPars
     rectangle.x <= viewport.width && rectangle.y <= viewport.height;
 }
 
-const TARGET_KEYS = [
-  'targetId', 'sessionId', 'pageIdentity', 'sourceSnapshotId', 'coordinateSpace',
-  'rectangle', 'viewport', 'role', 'label', 'guide', 'actionMode', 'createdAt',
-  'expiresAt', 'consumedAt'
+const TARGET_KEYS_V1 = [
+  'contractVersion', 'materializationMode', 'targetId', 'sessionId', 'pageIdentity',
+  'sourceSnapshotId', 'coordinateSpace', 'rectangle', 'viewport', 'role', 'label',
+  'guide', 'actionMode', 'createdAt', 'expiresAt', 'consumedAt'
 ] as const;
+const TARGET_KEYS_V2 = [...TARGET_KEYS_V1, 'locator'] as const;
 
 export function parsePublicOverlayTarget(
   payload: unknown,
   context: OverlayParseContext
 ): PublicOverlayTarget | null {
   const item = record(payload);
-  if (!item || !exactKeys(item, TARGET_KEYS)) return null;
+  const expectedMode = context.materializationMode ?? 'USER_DOM_PUBLIC_TARGET';
+  const isV2 = item?.contractVersion === 2 &&
+    item.materializationMode === 'USER_DOM_PUBLIC_TARGET';
+  const isV1 = item?.contractVersion === 1 &&
+    item.materializationMode === 'BACKEND_VIEWPORT_RECT';
+  if (!item || (isV2 ? !exactKeys(item, TARGET_KEYS_V2) : !exactKeys(item, TARGET_KEYS_V1)) ||
+      (expectedMode === 'USER_DOM_PUBLIC_TARGET' ? !isV2 : !isV1)) return null;
+
   const rectangle = parseRectangle(item.rectangle);
   const viewport = parseViewport(item.viewport);
-  if (!rectangle || !viewport || !safeId(item.targetId) || item.sessionId !== context.sessionId ||
-      item.pageIdentity !== context.pageIdentity || !safeId(item.sourceSnapshotId) ||
-      item.coordinateSpace !== 'VIEWPORT_CSS_PX' || item.actionMode !== 'GUIDE_USER_CLICK' ||
-      typeof item.role !== 'string' || !TARGET_ROLES.has(item.role) ||
-      !safeText(item.label, 120) || !safeText(item.guide, 200) ||
-      !timestamp(item.createdAt) || !timestamp(item.expiresAt) || item.consumedAt !== null) return null;
+  const locator = isV2 ? parsePublicTargetLocator(item.locator) : null;
+  if (!rectangle || !viewport || !isProtocolIdentifier(item.targetId) ||
+      item.sessionId !== context.sessionId || item.pageIdentity !== context.pageIdentity ||
+      !isProtocolIdentifier(item.sourceSnapshotId) || item.coordinateSpace !== 'VIEWPORT_CSS_PX' ||
+      item.actionMode !== 'GUIDE_USER_CLICK' || typeof item.role !== 'string' ||
+      !TARGET_ROLES.has(item.role) || !safeUserText(item.label, 120) ||
+      !safeUserText(item.guide, 200) || !timestamp(item.createdAt) ||
+      !timestamp(item.expiresAt) || item.consumedAt !== null ||
+      (isV2 && (!locator || locator.role !== item.role || locator.accessibleName !== item.label))) return null;
+
   const target: PublicOverlayTarget = {
+    contractVersion: isV2 ? 2 : 1,
+    materializationMode: isV2 ? 'USER_DOM_PUBLIC_TARGET' : 'BACKEND_VIEWPORT_RECT',
     targetId: item.targetId,
     sessionId: item.sessionId,
     pageIdentity: item.pageIdentity,
     sourceSnapshotId: item.sourceSnapshotId,
     coordinateSpace: 'VIEWPORT_CSS_PX', rectangle, viewport, role: item.role,
-    label: item.label, guide: item.guide, actionMode: 'GUIDE_USER_CLICK',
-    createdAt: item.createdAt, expiresAt: item.expiresAt, consumedAt: null
+    label: item.label, guide: item.guide, locator,
+    actionMode: 'GUIDE_USER_CLICK', createdAt: item.createdAt,
+    expiresAt: item.expiresAt, consumedAt: null
   };
   const now = context.now ?? Date.now();
-  if (Date.parse(target.expiresAt) <= now || Date.parse(target.expiresAt) <= Date.parse(target.createdAt) ||
-      !targetGeometryIsValid(target, context)) return null;
+  if (Date.parse(target.expiresAt) <= now ||
+      Date.parse(target.expiresAt) <= Date.parse(target.createdAt) ||
+      (isV1 && !legacyGeometryIsValid(target, context))) return null;
   return target;
 }
 
-const OVERLAY_EVENT_KEYS = [
+const OVERLAY_EVENT_KEYS_V1 = [
   'eventId', 'eventSequence', 'eventType', 'sessionId', 'workflowStatus',
-  'targetId', 'pageIdentity', 'sourceSnapshotId', 'coordinateSpace', 'rectangle',
-  'viewport', 'role', 'label', 'guide', 'actionMode', 'expiresAt', 'occurredAt'
+  'targetId', 'pageIdentity', 'contractVersion', 'materializationMode',
+  'sourceSnapshotId', 'coordinateSpace', 'rectangle', 'viewport', 'role', 'label',
+  'guide', 'actionMode', 'expiresAt', 'occurredAt'
 ] as const;
+const OVERLAY_EVENT_KEYS_V2 = [...OVERLAY_EVENT_KEYS_V1, 'locator'] as const;
 
 export function parseOverlayTargetEvent(payload: unknown, context: OverlayParseContext): OverlayTargetEvent | null {
   const item = record(payload);
-  if (!item || !exactKeys(item, OVERLAY_EVENT_KEYS) || !eventIdentity(item) ||
-      item.eventType !== 'OVERLAY_TARGET' || item.workflowStatus !== 'USER_DECISION_REQUIRED') return null;
+  const isV2 = item?.contractVersion === 2;
+  if (!item || !exactKeys(item, isV2 ? OVERLAY_EVENT_KEYS_V2 : OVERLAY_EVENT_KEYS_V1) ||
+      !eventIdentity(item) || item.eventType !== 'OVERLAY_TARGET' ||
+      item.workflowStatus !== 'USER_DECISION_REQUIRED') return null;
   const target = parsePublicOverlayTarget({
+    contractVersion: item.contractVersion, materializationMode: item.materializationMode,
     targetId: item.targetId, sessionId: item.sessionId, pageIdentity: item.pageIdentity,
     sourceSnapshotId: item.sourceSnapshotId, coordinateSpace: item.coordinateSpace,
     rectangle: item.rectangle, viewport: item.viewport, role: item.role, label: item.label,
-    guide: item.guide, actionMode: item.actionMode, createdAt: item.occurredAt,
+    guide: item.guide, ...(isV2 ? { locator: item.locator } : {}),
+    actionMode: item.actionMode, createdAt: item.occurredAt,
     expiresAt: item.expiresAt, consumedAt: null
   }, context);
   return target ? {
     eventId: item.eventId as string, eventSequence: item.eventSequence as number,
     eventType: 'OVERLAY_TARGET', sessionId: target.sessionId,
-    workflowStatus: 'USER_DECISION_REQUIRED', targetId: target.targetId,
+    workflowStatus: 'USER_DECISION_REQUIRED', contractVersion: target.contractVersion,
+    materializationMode: target.materializationMode, targetId: target.targetId,
     pageIdentity: target.pageIdentity, sourceSnapshotId: target.sourceSnapshotId,
     coordinateSpace: target.coordinateSpace, rectangle: target.rectangle,
     viewport: target.viewport, role: target.role, label: target.label, guide: target.guide,
-    actionMode: target.actionMode, expiresAt: target.expiresAt,
+    locator: target.locator, actionMode: target.actionMode, expiresAt: target.expiresAt,
     occurredAt: item.occurredAt as string
   } : null;
 }
@@ -155,34 +204,47 @@ export function overlayTargetFromEvent(event: OverlayTargetEvent): PublicOverlay
   return { ...event, createdAt: event.occurredAt, consumedAt: null };
 }
 
-export function parseOverlayClearEvent(payload: unknown, context: Pick<OverlayParseContext, 'sessionId' | 'pageIdentity'>): OverlayClearEvent | null {
+function requiresUserDomTarget(context: Pick<OverlayParseContext, 'materializationMode'>) {
+  return (context.materializationMode ?? 'USER_DOM_PUBLIC_TARGET') === 'USER_DOM_PUBLIC_TARGET';
+}
+
+export function parseOverlayClearEvent(
+  payload: unknown,
+  context: Pick<OverlayParseContext, 'sessionId' | 'pageIdentity' | 'materializationMode'>
+): OverlayClearEvent | null {
   const item = record(payload);
   const keys = ['eventId', 'eventSequence', 'eventType', 'sessionId', 'targetId',
-    'pageIdentity', 'sourceSnapshotId', 'reason', 'occurredAt'] as const;
+    'pageIdentity', 'sourceSnapshotId', 'publicTargetKey', 'reason', 'occurredAt'] as const;
   if (!item || !exactKeys(item, keys) || !eventIdentity(item) || item.eventType !== 'OVERLAY_CLEAR' ||
       item.sessionId !== context.sessionId || item.pageIdentity !== context.pageIdentity ||
-      !safeId(item.targetId) || !safeId(item.sourceSnapshotId) ||
+      !isProtocolIdentifier(item.targetId) || !isProtocolIdentifier(item.sourceSnapshotId) ||
+      (requiresUserDomTarget(context) ? !isPublicTargetKey(item.publicTargetKey) : item.publicTargetKey !== null) ||
       typeof item.reason !== 'string' || !CLEAR_REASONS.has(item.reason)) return null;
   return item as unknown as OverlayClearEvent;
 }
 
-export function parseUserActionObservedEvent(payload: unknown, context: Pick<OverlayParseContext, 'sessionId' | 'pageIdentity'>): UserActionObservedEvent | null {
+export function parseUserActionObservedEvent(
+  payload: unknown,
+  context: Pick<OverlayParseContext, 'sessionId' | 'pageIdentity' | 'materializationMode'>
+): UserActionObservedEvent | null {
   const item = record(payload);
   const keys = ['eventId', 'eventSequence', 'eventType', 'sessionId', 'workflowStatus',
     'observationId', 'requestId', 'targetId', 'pageIdentity', 'sourceSnapshotId',
-    'resultingSnapshotId', 'status', 'occurredAt'] as const;
+    'publicTargetKey', 'resultingSnapshotId', 'status', 'occurredAt'] as const;
   if (!item || !exactKeys(item, keys) || !eventIdentity(item) ||
       item.eventType !== 'USER_ACTION_OBSERVED' || item.workflowStatus !== 'AI_EXECUTING' ||
       item.sessionId !== context.sessionId || item.pageIdentity !== context.pageIdentity ||
-      !safeId(item.observationId) || !safeId(item.requestId) || !safeId(item.targetId) ||
-      !safeId(item.sourceSnapshotId) || !safeId(item.resultingSnapshotId) ||
+      !isProtocolIdentifier(item.observationId) || !isProtocolIdentifier(item.requestId) ||
+      !isProtocolIdentifier(item.targetId) || !isProtocolIdentifier(item.sourceSnapshotId) ||
+      !isProtocolIdentifier(item.resultingSnapshotId) ||
+      (requiresUserDomTarget(context) ? !isPublicTargetKey(item.publicTargetKey) : item.publicTargetKey !== null) ||
       item.status !== 'DOM_CHANGE_CONFIRMED') return null;
   return item as unknown as UserActionObservedEvent;
 }
 
 export function readDemoAgentBridge(value: unknown): DemoAgentBridgeBinding | null {
   const item = record(value);
-  if (!item || !safeId(item.sessionId)) return null;
+  if (!item || !isProtocolIdentifier(item.sessionId)) return null;
   return parseBrowserBridgeBinding(item, item.sessionId);
 }
 
@@ -197,13 +259,13 @@ export function parseBridgeRecovery(payload: unknown, binding: DemoAgentBridgeBi
   const allowedKeys = new Set<string>([...keys, 'activeTarget']);
   if (!data || !Object.keys(data).every((key) => allowedKeys.has(key)) ||
       !keys.every((key) => Object.prototype.hasOwnProperty.call(data, key)) ||
-      data.sessionId !== binding.sessionId ||
-      data.pageIdentity !== binding.pageIdentity ||
+      data.sessionId !== binding.sessionId || data.pageIdentity !== binding.pageIdentity ||
       data.eventSubscription !== `/topic/sessions/${binding.sessionId}/events` ||
       data.conversationSnapshotPath !== `/api/v1/sessions/${binding.sessionId}/conversation` ||
       !timestamp(data.expiresAt) || Date.parse(data.expiresAt) <= now) return null;
   const activeTarget = data.activeTarget == null ? null : parsePublicOverlayTarget(data.activeTarget, {
-    sessionId: binding.sessionId, pageIdentity: binding.pageIdentity, viewport, now
+    sessionId: binding.sessionId, pageIdentity: binding.pageIdentity, viewport, now,
+    materializationMode: 'USER_DOM_PUBLIC_TARGET'
   });
   if (data.activeTarget != null && !activeTarget) return null;
   return { sessionId: binding.sessionId, pageIdentity: binding.pageIdentity,
@@ -222,6 +284,9 @@ export function parseObservationAck(payload: unknown, expected: {
   if (!data || !exactKeys(data, keys) || data.sessionId !== expected.sessionId ||
       data.requestId !== expected.requestId || data.targetId !== expected.targetId ||
       data.pageIdentity !== expected.pageIdentity || data.sourceSnapshotId !== expected.sourceSnapshotId ||
-      data.status !== 'OBSERVATION_ACCEPTED' || !timestamp(data.acceptedAt)) return null;
+      data.status !== 'OBSERVATION_ACCEPTED' || !timestamp(data.acceptedAt) ||
+      !isProtocolIdentifier(data.sessionId) || !isProtocolIdentifier(data.requestId) ||
+      !isProtocolIdentifier(data.targetId) || !isProtocolIdentifier(data.pageIdentity) ||
+      !isProtocolIdentifier(data.sourceSnapshotId)) return null;
   return data as unknown as InteractionObservationAccepted;
 }

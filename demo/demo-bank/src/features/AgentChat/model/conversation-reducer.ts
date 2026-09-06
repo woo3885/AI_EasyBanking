@@ -172,7 +172,8 @@ function applyServerEvent(state: ConversationState, event: ConversationServerEve
   if (event.eventType === 'OVERLAY_CLEAR') {
     const matches = state.activeTarget?.targetId === event.targetId &&
       state.activeTarget.pageIdentity === event.pageIdentity &&
-      state.activeTarget.sourceSnapshotId === event.sourceSnapshotId;
+      state.activeTarget.sourceSnapshotId === event.sourceSnapshotId &&
+      state.activeTarget.locator?.publicTargetKey === event.publicTargetKey;
     return {
       ...state,
       ...common,
@@ -186,7 +187,8 @@ function applyServerEvent(state: ConversationState, event: ConversationServerEve
     const matches = state.pendingObservation?.requestId === event.requestId &&
       state.pendingObservation.targetId === event.targetId &&
       state.pendingObservation.pageIdentity === event.pageIdentity &&
-      state.pendingObservation.sourceSnapshotId === event.sourceSnapshotId;
+      state.pendingObservation.sourceSnapshotId === event.sourceSnapshotId &&
+      state.pendingObservation.publicTargetKey === event.publicTargetKey;
     return {
       ...state,
       ...common,
@@ -387,7 +389,8 @@ export function conversationReducer(state: ConversationState, action: Conversati
           !state.activeTarget || state.observationPhase !== 'IDLE' ||
           state.activeTarget.targetId !== action.observation.targetId ||
           state.activeTarget.pageIdentity !== action.observation.pageIdentity ||
-          state.activeTarget.sourceSnapshotId !== action.observation.sourceSnapshotId) return state;
+          state.activeTarget.sourceSnapshotId !== action.observation.sourceSnapshotId ||
+          state.activeTarget.locator?.publicTargetKey !== action.observation.publicTargetKey) return state;
       return { ...state, observationPhase: 'SUBMITTING', pendingObservation: action.observation };
     case 'OBSERVATION_ACKNOWLEDGED':
       return state.pendingObservation?.requestId === action.requestId &&

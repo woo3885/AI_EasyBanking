@@ -1,5 +1,8 @@
 export type OverlayCoordinateSpace = 'VIEWPORT_CSS_PX';
 export type OverlayActionMode = 'GUIDE_USER_CLICK';
+export type OverlayMaterializationMode =
+  | 'BACKEND_VIEWPORT_RECT'
+  | 'USER_DOM_PUBLIC_TARGET';
 
 export type OverlayClearReason =
   | 'REPLACED'
@@ -26,7 +29,16 @@ export interface OverlayViewport {
   height: number;
 }
 
+export interface PublicTargetLocator {
+  type: 'PUBLIC_TARGET_KEY';
+  publicTargetKey: string;
+  role: string;
+  accessibleName: string;
+}
+
 export interface PublicOverlayTarget {
+  contractVersion: 1 | 2;
+  materializationMode: OverlayMaterializationMode;
   targetId: string;
   sessionId: string;
   pageIdentity: string;
@@ -37,10 +49,24 @@ export interface PublicOverlayTarget {
   role: string;
   label: string;
   guide: string;
+  locator: PublicTargetLocator | null;
   actionMode: OverlayActionMode;
   createdAt: string;
   expiresAt: string;
   consumedAt: string | null;
+}
+
+export interface MaterializedDomOverlayTarget {
+  target: PublicOverlayTarget;
+  localRectangle: OverlayRectangle;
+  viewport: OverlayViewport;
+}
+
+export interface ObservedDomTargetClick extends MaterializedDomOverlayTarget {
+  clickPosition: {
+    clientX: number;
+    clientY: number;
+  };
 }
 
 export type OverlayObservationPhase =
@@ -54,6 +80,7 @@ export interface PendingOverlayObservation {
   targetId: string;
   pageIdentity: string;
   sourceSnapshotId: string;
+  publicTargetKey: string;
 }
 
 export interface DemoAgentBridgeBinding {
@@ -79,6 +106,14 @@ export interface InteractionObservationRequest {
   requestId: string;
   targetId: string;
   sourceSnapshotId: string;
+  publicTargetKey: string;
+  role: string;
+  actionMode: OverlayActionMode;
+  localRectangle: OverlayRectangle;
+  clickPosition: {
+    clientX: number;
+    clientY: number;
+  };
   observationType: 'USER_CLICK';
   clientOccurredAt: string;
 }

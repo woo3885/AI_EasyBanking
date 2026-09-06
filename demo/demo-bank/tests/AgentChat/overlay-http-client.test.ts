@@ -32,6 +32,10 @@ describe('Overlay HTTP client', () => {
 
   it('click observation request를 직렬화하고 202 identity를 검증한다', async () => {
     const request = { requestId: 'request-1', targetId: 'target-1', sourceSnapshotId: 'snap-1',
+      publicTargetKey: 'deposit-product-12m-select', role: 'button',
+      actionMode: 'GUIDE_USER_CLICK' as const,
+      localRectangle: { x: 100, y: 200, width: 180, height: 56 },
+      clickPosition: { clientX: 110, clientY: 210 },
       observationType: 'USER_CLICK' as const, clientOccurredAt: '2026-09-06T12:00:00Z' };
     const fetcher = vi.fn(async () => response({ sessionId: 'session-1', requestId: 'request-1',
       targetId: 'target-1', pageIdentity: 'page-1', sourceSnapshotId: 'snap-1',
@@ -52,6 +56,10 @@ describe('Overlay HTTP client', () => {
       status: 'OBSERVATION_ACCEPTED', acceptedAt: '2026-09-06T12:00:01Z' }, 202));
     await expect(createOverlayHttpClient('http://127.0.0.1:8080', fetcher).observeClick(binding, {
       requestId: 'request-1', targetId: 'target-1', sourceSnapshotId: 'snap-1',
+      publicTargetKey: 'deposit-product-12m-select', role: 'button',
+      actionMode: 'GUIDE_USER_CLICK',
+      localRectangle: { x: 100, y: 200, width: 180, height: 56 },
+      clickPosition: { clientX: 110, clientY: 210 },
       observationType: 'USER_CLICK', clientOccurredAt: '2026-09-06T12:00:00Z'
     }, new AbortController().signal)).rejects.toThrow('INVALID_OBSERVATION_ACK');
     expect(fetcher).toHaveBeenCalledTimes(1);
