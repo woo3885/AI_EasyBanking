@@ -508,6 +508,39 @@ class SanitizedDomSnapshotServiceTest {
     }
 
     @Test
+    void 공개_target_key를_추출하고_중복이나_잘못된_형식은_차단한다() {
+        manager.execute(SESSION_ID, Duration.ofSeconds(5), page -> {
+            page.setContent("""
+                    <button data-ddd-public-target="deposit-product-12m-select">상품 선택</button>
+                    """);
+            return null;
+        });
+
+        assertThat(service.createSnapshot(SESSION_ID).elements())
+                .extracting(SanitizedDomSnapshot.ElementSnapshot::publicTargetKey)
+                .containsExactly("deposit-product-12m-select");
+
+        manager.execute(SESSION_ID, Duration.ofSeconds(5), page -> {
+            page.setContent("""
+                    <button data-ddd-public-target="duplicate-key">첫 번째</button>
+                    <button data-ddd-public-target="duplicate-key">두 번째</button>
+                    """);
+            return null;
+        });
+        assertThatThrownBy(() -> service.createSnapshot(SESSION_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("동일 페이지의 공개 target key가 중복되었습니다.");
+
+        manager.execute(SESSION_ID, Duration.ofSeconds(5), page -> {
+            page.setContent("<button data-ddd-public-target='INVALID KEY'>선택</button>");
+            return null;
+        });
+        assertThatThrownBy(() -> service.createSnapshot(SESSION_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("공개 target key 형식이 올바르지 않습니다.");
+    }
+
+    @Test
     void 상품상세_Snapshot은_C가_추론없이_읽을_상품_semantic_context를_포함한다() {
         manager.execute(SESSION_ID, Duration.ofSeconds(5), page -> {
             page.route("**/*", route -> route.fulfill(

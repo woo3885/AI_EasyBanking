@@ -2,6 +2,7 @@ package com.ddd.backend.automation.dom;
 
 import java.util.List;
 import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 public record SanitizedDomSnapshot(
         String schemaVersion,
@@ -64,7 +65,8 @@ public record SanitizedDomSnapshot(
             boolean enabled,
             Boolean checked,
             BoundingBoxSnapshot boundingBox,
-            SecurityPolicy securityPolicy
+            SecurityPolicy securityPolicy,
+            @JsonIgnore String publicTargetKey
     ) {
 
         public ElementSnapshot {
@@ -87,11 +89,21 @@ public record SanitizedDomSnapshot(
         public ElementSnapshot(
                 String elementId, String tag, String role, String text,
                 String ariaLabel, String placeholder, String inputType,
+                boolean visible, boolean enabled, Boolean checked,
+                BoundingBoxSnapshot boundingBox, SecurityPolicy securityPolicy
+        ) {
+            this(elementId, tag, role, text, ariaLabel, placeholder, inputType,
+                    visible, enabled, checked, boundingBox, securityPolicy, null);
+        }
+
+        public ElementSnapshot(
+                String elementId, String tag, String role, String text,
+                String ariaLabel, String placeholder, String inputType,
                 boolean visible, boolean enabled,
                 BoundingBoxSnapshot boundingBox, SecurityPolicy securityPolicy
         ) {
             this(elementId, tag, role, text, ariaLabel, placeholder, inputType,
-                    visible, enabled, null, boundingBox, securityPolicy);
+                    visible, enabled, null, boundingBox, securityPolicy, null);
         }
     }
 

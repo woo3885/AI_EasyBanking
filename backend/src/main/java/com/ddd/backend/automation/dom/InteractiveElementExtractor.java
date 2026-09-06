@@ -165,6 +165,11 @@ public final class InteractiveElementExtractor {
                             "data-ddd-policy"
                     );
 
+            String publicTargetKey =
+                    candidate.getAttribute(
+                            "data-ddd-public-target"
+                    );
+
             boolean visible =
                     candidate.isVisible();
 
@@ -226,7 +231,8 @@ public final class InteractiveElementExtractor {
                             x,
                             y,
                             width,
-                            height
+                            height,
+                            publicTargetKey
                     )
             );
         }

@@ -33,15 +33,17 @@ public final class ConversationEventStore {
     public synchronized OverlayTargetEvent overlayTarget(PublicOverlayTarget target, Instant at) {
         var event = new OverlayTargetEvent(UUID.randomUUID().toString(), lastSequence(target.sessionId()) + 1,
                 "OVERLAY_TARGET", target.sessionId(), WorkflowStatus.USER_DECISION_REQUIRED,
-                target.targetId(), target.pageIdentity(), target.sourceSnapshotId(), target.coordinateSpace(),
+                target.targetId(), target.pageIdentity(), target.contractVersion(), target.materializationMode(),
+                target.sourceSnapshotId(), target.coordinateSpace(),
                 target.rectangle(), target.viewport(), target.role(), target.label(), target.guide(),
-                target.actionMode(), target.expiresAt(), at);
+                target.locator(), target.actionMode(), target.expiresAt(), at);
         events.computeIfAbsent(target.sessionId(), ignored -> new ArrayList<>()).add(event); return event;
     }
     public synchronized OverlayClearEvent overlayClear(PublicOverlayTarget target, OverlayClearReason reason, Instant at) {
         var event = new OverlayClearEvent(UUID.randomUUID().toString(), lastSequence(target.sessionId()) + 1,
                 "OVERLAY_CLEAR", target.sessionId(), target.targetId(), target.pageIdentity(),
-                target.sourceSnapshotId(), reason, at);
+                target.sourceSnapshotId(), target.locator() == null ? null : target.locator().publicTargetKey(),
+                reason, at);
         events.computeIfAbsent(target.sessionId(), ignored -> new ArrayList<>()).add(event); return event;
     }
     public synchronized UserActionObservedEvent userActionObserved(PublicOverlayTarget target,
@@ -49,6 +51,7 @@ public final class ConversationEventStore {
         var event = new UserActionObservedEvent(UUID.randomUUID().toString(), lastSequence(target.sessionId()) + 1,
                 "USER_ACTION_OBSERVED", target.sessionId(), WorkflowStatus.AI_EXECUTING,
                 observationId, requestId, target.targetId(), target.pageIdentity(), target.sourceSnapshotId(),
+                target.locator() == null ? null : target.locator().publicTargetKey(),
                 resultingSnapshotId, "DOM_CHANGE_CONFIRMED", at);
         events.computeIfAbsent(target.sessionId(), ignored -> new ArrayList<>()).add(event); return event;
     }

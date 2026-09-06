@@ -72,6 +72,7 @@ public final class InteractionObservationService {
         OverlayTargetStore.ClaimedTarget claimed = targets.claim(sessionId, request.requestId(),
                 request.targetId(), pageIdentity, request.sourceSnapshotId());
         try {
+            validateObservationIdentity(request, claimed.target());
             validateCurrentElement(sessionId, claimed);
         } catch (RuntimeException invalid) {
             targets.clear(sessionId, OverlayClearReason.TARGET_INVALID);
@@ -79,7 +80,8 @@ public final class InteractionObservationService {
         }
         PublicOverlayTarget consumed = targets.consume(sessionId, request.targetId());
         SanitizedDomSnapshot resulting = snapshots.createSnapshot(sessionId);
-        if (claimed.sourceFingerprint().equals(DomSnapshotFingerprint.of(resulting))) {
+        if (consumed.materializationMode() == OverlayMaterializationMode.BACKEND_VIEWPORT_RECT
+                && claimed.sourceFingerprint().equals(DomSnapshotFingerprint.of(resulting))) {
             throw new OverlayTargetException(OBSERVATION_DOM_NOT_CHANGED);
         }
         session.transitionTo(WorkflowStatus.AI_EXECUTING);
@@ -111,6 +113,14 @@ public final class InteractionObservationService {
             try { locator = elements.resolveLocator(page, sessionId, claimed.internalElementId()); }
             catch (RuntimeException stale) { throw new OverlayTargetException(TARGET_NOT_INTERACTABLE); }
             if (!locator.isVisible() || !locator.isEnabled()) throw new OverlayTargetException(TARGET_NOT_INTERACTABLE);
+            if (claimed.target().materializationMode() == OverlayMaterializationMode.USER_DOM_PUBLIC_TARGET) {
+                PublicTargetLocator expected = claimed.target().locator();
+                if (!expected.publicTargetKey().equals(locator.getAttribute("data-ddd-public-target"))
+                        || !expected.accessibleName().equals(locator.getAttribute("aria-label"))) {
+                    throw new OverlayTargetException(PUBLIC_TARGET_KEY_MISMATCH);
+                }
+                return null;
+            }
             Map<?, ?> rect = (Map<?, ?>) locator.evaluate("element => { const r=element.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height}; }");
             var expected = claimed.target().rectangle();
             if (!near(expected.x(), rect, "x") || !near(expected.y(), rect, "y")
@@ -119,6 +129,27 @@ public final class InteractionObservationService {
             }
             return null;
         });
+    }
+    private void validateObservationIdentity(InteractionObservationRequest request, PublicOverlayTarget target) {
+        if (target.materializationMode() != OverlayMaterializationMode.USER_DOM_PUBLIC_TARGET) return;
+        PublicTargetLocator locator = target.locator();
+        if (locator == null || !locator.publicTargetKey().equals(request.publicTargetKey())
+                || !locator.role().equals(request.role()) || request.actionMode() != target.actionMode()) {
+            throw new OverlayTargetException(PUBLIC_TARGET_KEY_MISMATCH);
+        }
+        var rectangle = request.localRectangle();
+        var click = request.clickPosition();
+        if (rectangle == null || click == null || !finite(rectangle.x(), rectangle.y(),
+                rectangle.width(), rectangle.height(), click.clientX(), click.clientY())
+                || rectangle.width() <= 0 || rectangle.height() <= 0
+                || click.clientX() < rectangle.x() || click.clientX() > rectangle.x() + rectangle.width()
+                || click.clientY() < rectangle.y() || click.clientY() > rectangle.y() + rectangle.height()) {
+            throw new OverlayTargetException(OBSERVATION_CLICK_OUTSIDE);
+        }
+    }
+    private boolean finite(double... values) {
+        for (double value : values) if (!Double.isFinite(value)) return false;
+        return true;
     }
     private boolean near(double expected, Map<?, ?> values, String key) {
         Object raw = values.get(key);
