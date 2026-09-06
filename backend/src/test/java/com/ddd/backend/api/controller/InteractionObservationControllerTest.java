@@ -27,7 +27,7 @@ class InteractionObservationControllerTest {
 
     @Test
     void observation은_성공을_의미하지_않는_202_ACK를_반환한다() throws Exception {
-        when(observations.observe(eq("session-1"), eq("secret"), eq("page-1"),
+        when(observations.observe(eq("session-1"), eq("secret"), eq("binding-1"), eq("page-1"),
                 eq("http://127.0.0.1:5190"), any())).thenReturn(
                 new InteractionObservationAcceptedResponse("session-1", "request-1", "target-1",
                         "page-1", "snap-1", "OBSERVATION_ACCEPTED",
@@ -36,6 +36,7 @@ class InteractionObservationControllerTest {
         mockMvc.perform(post("/api/v1/sessions/session-1/interaction-observations")
                         .header("Origin", "http://127.0.0.1:5190")
                         .header(ConversationBridgeController.BRIDGE_TOKEN_HEADER, "secret")
+                        .header(ConversationBridgeController.BROWSER_BINDING_ID_HEADER, "binding-1")
                         .header(ConversationBridgeController.PAGE_IDENTITY_HEADER, "page-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

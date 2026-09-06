@@ -271,6 +271,15 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.failure(errorCode));
     }
 
+    @ExceptionHandler(com.ddd.backend.conversation.navigation.BrowserNavigationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBrowserNavigation(
+            com.ddd.backend.conversation.navigation.BrowserNavigationException exception) {
+        var error = exception.error();
+        log.warn("Browser navigation rejected. errorCode={}", error.name());
+        return ResponseEntity.status(error.status())
+                .body(new ApiResponse<>(false, null, error.name(), error.safeMessage()));
+    }
+
     @ExceptionHandler(
             Exception.class
     )

@@ -36,11 +36,11 @@ class ConversationBridgeControllerTest {
     void setUp() {
         when(sessions.getSession("session-1"))
                 .thenReturn(AutomationSession.create("request without secret"));
-        when(bridges.require("session-1", "secret", "http://127.0.0.1:5190", "page-1"))
+        when(bridges.require("session-1", "secret", "http://127.0.0.1:5190", "binding-1", "page-1"))
                 .thenReturn(new UserBrowserBridgeBinding(
-                        "session-1", "secret", "page-1",
+                        "session-1", "binding-1", "secret", "page-1",
                         "http://127.0.0.1:5190", expiresAt));
-        when(bridges.require("session-1", null, "http://127.0.0.1:5190", null))
+        when(bridges.require("session-1", null, "http://127.0.0.1:5190", null, null))
                 .thenThrow(new DemoAgentBridgeAuthenticationException());
     }
 
@@ -49,6 +49,7 @@ class ConversationBridgeControllerTest {
         mockMvc.perform(get("/api/v1/sessions/session-1/conversation/bridge")
                         .header("Origin", "http://127.0.0.1:5190")
                         .header(ConversationBridgeController.BRIDGE_TOKEN_HEADER, "secret")
+                        .header(ConversationBridgeController.BROWSER_BINDING_ID_HEADER, "binding-1")
                         .header(ConversationBridgeController.PAGE_IDENTITY_HEADER, "page-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.sessionId").value("session-1"))

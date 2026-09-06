@@ -26,10 +26,10 @@ class UserBrowserBridgeServiceTest {
 
         UserBrowserBridgeBinding issued = service.issue("session-1", "https://frontend.example");
 
-        assertThat(issued.pageIdentity()).isEqualTo("page-1");
+        assertThat(issued.pageIdentity()).isNotEqualTo("page-1");
         assertThat(issued.bridgeToken()).isNotEqualTo("playwright-secret");
         assertThat(browser.require("session-1", issued.bridgeToken(),
-                "https://frontend.example", "page-1")).isEqualTo(issued);
+                "https://frontend.example", issued.browserBindingId(), issued.pageIdentity())).isEqualTo(issued);
     }
 
     @Test

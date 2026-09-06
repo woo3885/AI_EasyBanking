@@ -246,7 +246,7 @@ class AutomationSessionControllerTest {
                 org.mockito.ArgumentMatchers.eq(session.getSessionId()),
                 org.mockito.ArgumentMatchers.eq("http://127.0.0.1:5173")))
                 .thenReturn(new UserBrowserBridgeBinding(
-                        session.getSessionId(), "one-time-memory-token", "page-1",
+                        session.getSessionId(), "binding-1", "one-time-memory-token", "page-1",
                         "http://127.0.0.1:5173",
                         java.time.Instant.parse("2026-09-01T00:30:00Z")));
 
@@ -267,6 +267,7 @@ class AutomationSessionControllerTest {
                 .andExpect(jsonPath("$.data.acceptedSequence").value(1))
                 .andExpect(jsonPath("$.data.queueStatus").value("ACTIVE"))
                 .andExpect(jsonPath("$.data.bridgeBinding.sessionId").value(session.getSessionId()))
+                .andExpect(jsonPath("$.data.bridgeBinding.browserBindingId").value("binding-1"))
                 .andExpect(jsonPath("$.data.bridgeBinding.bridgeToken").value("one-time-memory-token"))
                 .andExpect(jsonPath("$.data.bridgeBinding.pageIdentity").value("page-1"))
                 .andExpect(jsonPath("$.data.bridgeBinding.pageReadyStatus").value("READY"))

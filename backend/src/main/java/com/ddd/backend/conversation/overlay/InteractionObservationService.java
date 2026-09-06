@@ -60,8 +60,9 @@ public final class InteractionObservationService {
     }
 
     public InteractionObservationAcceptedResponse observe(String sessionId, String bridgeToken,
-            String pageIdentity, String origin, InteractionObservationRequest request) {
-        UserBrowserBridgeBinding binding = authenticate(sessionId, bridgeToken, pageIdentity, origin);
+            String browserBindingId, String pageIdentity, String origin, InteractionObservationRequest request) {
+        UserBrowserBridgeBinding binding = authenticate(
+                sessionId, bridgeToken, browserBindingId, pageIdentity, origin);
         AutomationSession session = sessions.findById(sessionId)
                 .orElseThrow(() -> new OverlayTargetException(TARGET_NOT_FOUND));
         if (BLOCKED.contains(session.getStatus())
@@ -94,11 +95,12 @@ public final class InteractionObservationService {
     }
 
     private UserBrowserBridgeBinding authenticate(String sessionId, String token,
-            String pageIdentity, String origin) {
+            String browserBindingId, String pageIdentity, String origin) {
         UserBrowserBridgeBinding binding = bridges.find(sessionId)
                 .orElseThrow(() -> new OverlayTargetException(BRIDGE_TOKEN_INVALID));
         if (!constantTimeEquals(binding.bridgeToken(), token)) throw new OverlayTargetException(BRIDGE_TOKEN_INVALID);
         if (!binding.allowedOrigin().equals(origin)) throw new OverlayTargetException(BRIDGE_ORIGIN_NOT_ALLOWED);
+        if (!binding.browserBindingId().equals(browserBindingId)) throw new OverlayTargetException(BRIDGE_TOKEN_INVALID);
         if (!binding.pageIdentity().equals(pageIdentity)) throw new OverlayTargetException(TARGET_STALE_PAGE);
         return binding;
     }
