@@ -66,6 +66,9 @@ test("C-D2-05 prompt states the non-negotiable action and authority rules", () =
     "최종 거래 승인",
     "stale target",
     "Backend 권한",
+    "sanitized DOM의 elementId",
+    "target이 없거나 중복이면 STOP",
+    "public overlay target",
   ]) {
     assert.match(prompt, new RegExp(rule, "u"));
   }
