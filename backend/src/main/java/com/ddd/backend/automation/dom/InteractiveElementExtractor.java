@@ -5,6 +5,7 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.BoundingBox;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -39,15 +40,25 @@ public final class InteractiveElementExtractor {
             """;
 
     private final BrowserSessionManager browserSessionManager;
+    private final ElementFingerprintExtractor fingerprints;
 
     public InteractiveElementExtractor(
             BrowserSessionManager browserSessionManager
+    ) {
+        this(browserSessionManager, new ElementFingerprintExtractor());
+    }
+
+    @Autowired
+    public InteractiveElementExtractor(
+            BrowserSessionManager browserSessionManager,
+            ElementFingerprintExtractor fingerprints
     ) {
         this.browserSessionManager =
                 Objects.requireNonNull(
                         browserSessionManager,
                         "BrowserSessionManager는 필수입니다."
                 );
+        this.fingerprints = Objects.requireNonNull(fingerprints, "Fingerprint extractor는 필수입니다.");
     }
 
     public List<InteractiveElement> extract(
@@ -111,45 +122,7 @@ public final class InteractiveElementExtractor {
              * value / inputValue()는
              * 절대 읽지 않는다.
              */
-            String text =
-                    candidate.textContent();
-
-            /*
-             * 같은 상품 카드 안의 선택 버튼은 버튼 문구 대신 가까운
-             * semantic heading만 사용한다. 카드 전체 텍스트나 금리는 읽지 않는다.
-             */
-            if ("button".equals(tagName)) {
-                Object cardHeading = candidate.evaluate(
-                        """
-                        element => {
-                          const container = element.closest('article');
-                          const heading = container?.querySelector('h1, h2, h3');
-                          return heading?.innerText?.trim() || null;
-                        }
-                        """);
-                if (cardHeading instanceof String heading && !heading.isBlank()) {
-                    text = heading;
-                }
-            }
-
-            if (text == null || text.isBlank()) {
-                Object associatedLabel = candidate.evaluate(
-                        """
-                        element => {
-                          const direct = element.closest('label');
-                          if (direct?.innerText?.trim()) return direct.innerText;
-                          const id = element.getAttribute('id');
-                          if (!id) return null;
-                          const label = Array.from(document.querySelectorAll('label'))
-                            .find(candidate => candidate.htmlFor === id);
-                          return label?.innerText ?? null;
-                        }
-                        """
-                );
-                text = associatedLabel instanceof String
-                        ? (String) associatedLabel
-                        : text;
-            }
+            String text = fingerprints.semanticText(candidate);
 
             String role =
                     readRole(

@@ -134,6 +134,7 @@ public final class PlaywrightWorker implements AutoCloseable {
                         BrowserTaskResult.failed(
                                 task,
                                 FAILED_MESSAGE,
+                                exception,
                                 startedAt
                         )
                 );

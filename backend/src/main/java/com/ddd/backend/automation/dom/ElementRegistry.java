@@ -3,6 +3,7 @@ package com.ddd.backend.automation.dom;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.concurrent.ConcurrentMap;
 public final class ElementRegistry {
 
     private final DomSanitizer sanitizer;
+    private final ElementFingerprintExtractor fingerprints;
 
     /*
      * sessionId별로 최신 Snapshot 하나만 유지한다.
@@ -29,11 +31,20 @@ public final class ElementRegistry {
     public ElementRegistry(
             DomSanitizer sanitizer
     ) {
+        this(sanitizer, new ElementFingerprintExtractor());
+    }
+
+    @Autowired
+    public ElementRegistry(
+            DomSanitizer sanitizer,
+            ElementFingerprintExtractor fingerprints
+    ) {
         this.sanitizer =
                 Objects.requireNonNull(
                         sanitizer,
                         "DomSanitizer는 필수입니다."
                 );
+        this.fingerprints = Objects.requireNonNull(fingerprints, "Fingerprint extractor는 필수입니다.");
     }
 
     public void replaceSnapshot(
@@ -314,7 +325,7 @@ public final class ElementRegistry {
 
         String text =
                 sanitizer.sanitizeText(
-                        locator.textContent()
+                        fingerprints.semanticText(locator)
                 );
 
         String ariaLabel =
