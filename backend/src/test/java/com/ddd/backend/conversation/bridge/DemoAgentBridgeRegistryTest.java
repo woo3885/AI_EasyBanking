@@ -22,12 +22,10 @@ class DemoAgentBridgeRegistryTest {
                 .isEqualTo(binding);
         assertThatThrownBy(() -> registry.require(
                 "session-1", "secret", "http://evil.example", "page-1"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("identity");
+                .isInstanceOf(DemoAgentBridgeAuthenticationException.class);
         assertThatThrownBy(() -> registry.require(
                 "session-1", "secret", "http://127.0.0.1:5190", "page-2"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("identity");
+                .isInstanceOf(DemoAgentBridgeAuthenticationException.class);
     }
 
     @Test
@@ -38,5 +36,19 @@ class DemoAgentBridgeRegistryTest {
                 Instant.now().minusSeconds(1)));
 
         assertThat(registry.find("session-1")).isEmpty();
+    }
+
+    @Test
+    void bootstrap은_허용_origin에서만_identity를_노출한다() {
+        DemoAgentBridgeBinding binding = new DemoAgentBridgeBinding(
+                "session-1", "secret", "page-1", "http://127.0.0.1:5190",
+                Instant.now().plusSeconds(60));
+
+        String script = DemoAgentBridgeService.bootstrapScript(binding);
+
+        assertThat(script).contains(
+                "window.location.origin !== 'http://127.0.0.1:5190'");
+        assertThat(script.indexOf("window.location.origin"))
+                .isLessThan(script.indexOf("bridgeToken:'secret'"));
     }
 }

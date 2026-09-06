@@ -31,11 +31,11 @@ public final class DemoAgentBridgeRegistry {
             String pageIdentity
     ) {
         DemoAgentBridgeBinding binding = find(sessionId)
-                .orElseThrow(() -> new IllegalStateException("활성 Demo Agent bridge를 찾을 수 없습니다."));
+                .orElseThrow(DemoAgentBridgeAuthenticationException::new);
         if (!constantTimeEquals(binding.bridgeToken(), bridgeToken)
                 || !binding.allowedOrigin().equals(origin)
                 || !binding.pageIdentity().equals(pageIdentity)) {
-            throw new IllegalStateException("Demo Agent bridge identity가 일치하지 않습니다.");
+            throw new DemoAgentBridgeAuthenticationException();
         }
         return binding;
     }

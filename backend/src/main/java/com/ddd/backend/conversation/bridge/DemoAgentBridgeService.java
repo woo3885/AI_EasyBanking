@@ -42,14 +42,7 @@ public final class DemoAgentBridgeService {
                 "page-" + UUID.randomUUID(),
                 origin,
                 Instant.now().plus(ttl));
-        String script = """
-                (() => {
-                  const binding = Object.freeze({sessionId:'%s', bridgeToken:'%s', pageIdentity:'%s'});
-                  Object.defineProperty(window, '__DDD_AGENT_BRIDGE__', {
-                    value: binding, configurable: false, enumerable: false, writable: false
-                  });
-                })()
-                """.formatted(binding.sessionId(), binding.bridgeToken(), binding.pageIdentity());
+        String script = bootstrapScript(binding);
         browserSessions.execute(sessionId, BOOTSTRAP_TIMEOUT, page -> {
             page.addInitScript(script);
             page.evaluate(script);
@@ -57,6 +50,22 @@ public final class DemoAgentBridgeService {
         });
         registry.put(binding);
         return binding;
+    }
+
+    static String bootstrapScript(DemoAgentBridgeBinding binding) {
+        return """
+                (() => {
+                  if (window.location.origin !== '%s') return;
+                  const binding = Object.freeze({sessionId:'%s', bridgeToken:'%s', pageIdentity:'%s'});
+                  Object.defineProperty(window, '__DDD_AGENT_BRIDGE__', {
+                    value: binding, configurable: false, enumerable: false, writable: false
+                  });
+                })()
+                """.formatted(
+                        binding.allowedOrigin(),
+                        binding.sessionId(),
+                        binding.bridgeToken(),
+                        binding.pageIdentity());
     }
 
     public void removeSession(String sessionId) {

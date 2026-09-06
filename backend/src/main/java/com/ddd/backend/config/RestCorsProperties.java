@@ -12,11 +12,12 @@ public class RestCorsProperties {
     /*
      * Frontend 개발 서버 Origin.
      *
-     * 기본값은 127.0.0.1:5173 하나만 허용한다.
+     * 기본값은 Frontend 개발 서버와 로컬 Demo Bank만 허용한다.
      */
     private List<String> allowedOrigins =
             List.of(
-                    "http://127.0.0.1:5173"
+                    "http://127.0.0.1:5173",
+                    "http://127.0.0.1:5190"
             );
 
     public List<String> getAllowedOrigins() {
