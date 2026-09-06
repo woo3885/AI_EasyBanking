@@ -227,6 +227,13 @@ describe('AgentChatPanel', () => {
     expect(screen.getByRole('button', { name: '요청 전송' })).toBeDisabled();
   });
 
+  it('전송 버튼 disabled 이유를 안내 문구와 직접 연결한다', () => {
+    render(<AgentChatPanel value="" messages={[]} submitPhase="IDLE" safeError={null}
+      onDraftChange={vi.fn()} onSubmit={vi.fn()} onDismissError={vi.fn()} />);
+    expect(screen.getByRole('button', { name: '요청 전송' }))
+      .toHaveAttribute('aria-describedby', 'description-agent-message-policy status-agent-message-validation');
+  });
+
   it('실제 Demo Bank 페이지와 채팅 shell을 동일 레이아웃에 렌더링한다', () => {
     render(<HomePage />);
 

@@ -9,10 +9,11 @@ export interface ConversationTransportCallbacks {
   onSnapshot: (snapshot: ConversationSnapshot) => void;
   onEvent: (event: ConversationServerEvent) => void;
   onSafeError: () => void;
+  onConnectionError?: () => void;
 }
 
 export interface ConversationTransport {
-  start(sessionId: string): void;
+  start(sessionId: string, pageIdentity?: string): void;
   refreshSnapshot(): Promise<ConversationSnapshot | null>;
   disconnect(): void;
 }
@@ -24,6 +25,7 @@ export function createConversationTransport(options: {
   callbacks: ConversationTransportCallbacks;
 }): ConversationTransport {
   let sessionId: string | null = null;
+  let pageIdentity: string | null = null;
   let subscription: StompSubscription | null = null;
   let snapshotAbort: AbortController | null = null;
   let syncing = false;
@@ -70,10 +72,11 @@ export function createConversationTransport(options: {
   };
 
   return {
-    start(nextSessionId) {
+    start(nextSessionId, nextPageIdentity) {
       subscription?.disconnect();
       snapshotAbort?.abort();
       sessionId = nextSessionId;
+      pageIdentity = nextPageIdentity ?? null;
       subscription = options.stompClient.subscribe({
         webSocketUrl: options.webSocketUrl,
         destination: `/topic/sessions/${nextSessionId}/events`,
@@ -84,7 +87,11 @@ export function createConversationTransport(options: {
         onMessage(body) {
           let payload: unknown;
           try { payload = JSON.parse(body); } catch { options.callbacks.onSafeError(); return; }
-          const event = parseConversationEvent(payload);
+          const event = parseConversationEvent(payload, pageIdentity ? {
+            sessionId: nextSessionId,
+            pageIdentity,
+            viewport: { width: window.innerWidth, height: window.innerHeight }
+          } : undefined);
           if (!event || event.sessionId !== nextSessionId) {
             options.callbacks.onSafeError();
             return;
@@ -95,7 +102,10 @@ export function createConversationTransport(options: {
         onDisconnected(willReconnect) {
           if (willReconnect) options.callbacks.onReconnecting();
         },
-        onError: options.callbacks.onSafeError
+        onError() {
+          options.callbacks.onConnectionError?.();
+          options.callbacks.onSafeError();
+        }
       });
     },
     refreshSnapshot,
@@ -105,6 +115,7 @@ export function createConversationTransport(options: {
       snapshotAbort?.abort();
       snapshotAbort = null;
       sessionId = null;
+      pageIdentity = null;
       syncing = false;
       bufferedEvents = [];
     }

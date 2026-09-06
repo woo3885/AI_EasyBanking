@@ -3,8 +3,11 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { createConversationHttpClient, DEFAULT_CONVERSATION_API_BASE_URL, type ConversationHttpClient } from '../api/conversation-http-client';
 import { createNativeConversationStompClient, toConversationWebSocketUrl, type ConversationStompClient } from '../api/conversation-stomp-client';
 import { createConversationTransport, type ConversationTransport } from '../api/conversation-transport';
+import { createOverlayHttpClient, type OverlayHttpClient } from '../api/overlay-http-client';
+import { readDemoAgentBridge } from '../api/overlay-contract';
 import { conversationReducer } from '../model/conversation-reducer';
 import { createInitialConversationState, SAFE_CONNECTION_ERROR, SAFE_RESPONSE_ERROR, type ConversationAction, type ConversationMessage } from '../model/conversation-types';
+import type { DemoAgentBridgeBinding, PublicOverlayTarget } from '../model/overlay-types';
 
 export interface AgentChatSubmitRequest { requestId: string; message: ConversationMessage }
 
@@ -14,6 +17,8 @@ export interface AgentConversationDependencies {
   backendBaseUrl?: string;
   createId?: (prefix: string) => string;
   onSubmitRequest?: (request: AgentChatSubmitRequest) => void | Promise<void>;
+  overlayHttpClient?: OverlayHttpClient;
+  bridgeBinding?: DemoAgentBridgeBinding | null;
 }
 
 function defaultId(prefix: string) {
@@ -35,9 +40,16 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
   }, []);
   const submitLock = useRef(false);
   const requestAbort = useRef<AbortController | null>(null);
+  const bootstrapAbort = useRef<AbortController | null>(null);
+  const observationAbort = useRef<AbortController | null>(null);
+  const bridgeRef = useRef<DemoAgentBridgeBinding | null>(null);
   const transportRef = useRef<ConversationTransport | null>(null);
   const baseUrl = dependencies.backendBaseUrl ?? import.meta.env.VITE_BACKEND_BASE_URL ?? DEFAULT_CONVERSATION_API_BASE_URL;
   const httpClient = useMemo(() => dependencies.httpClient ?? createConversationHttpClient(baseUrl), [baseUrl, dependencies.httpClient]);
+  const overlayHttpClient = useMemo(
+    () => dependencies.overlayHttpClient ?? createOverlayHttpClient(baseUrl),
+    [baseUrl, dependencies.overlayHttpClient]
+  );
   const stompClient = useMemo(() => dependencies.stompClient ?? createNativeConversationStompClient(), [dependencies.stompClient]);
   const createId = dependencies.createId ?? defaultId;
 
@@ -46,7 +58,7 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
     transportRef.current = null;
   }, []);
 
-  const startTransport = useCallback((sessionId: string) => {
+  const startTransport = useCallback((sessionId: string, pageIdentity?: string) => {
     stopTransport();
     apply({ type: 'CONNECTION_CHANGED', connectionPhase: 'CONNECTING' });
     const transport = createConversationTransport({
@@ -56,6 +68,7 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
       callbacks: {
         onConnected: () => apply({ type: 'CONNECTION_CHANGED', connectionPhase: 'CONNECTED' }),
         onReconnecting: () => apply({ type: 'CONNECTION_CHANGED', connectionPhase: 'RECONNECTING' }),
+        onConnectionError: () => apply({ type: 'CONNECTION_CHANGED', connectionPhase: 'ERROR' }),
         onSnapshot: (snapshot) => apply({ type: 'SNAPSHOT_RESTORED', snapshot }),
         onEvent: (event) => {
           const before = stateRef.current;
@@ -68,8 +81,47 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
       }
     });
     transportRef.current = transport;
-    transport.start(sessionId);
+    transport.start(sessionId, pageIdentity);
   }, [apply, baseUrl, httpClient, stompClient, stopTransport]);
+
+  useEffect(() => {
+    const injected = dependencies.bridgeBinding === undefined
+      ? readDemoAgentBridge((window as Window & { __DDD_AGENT_BRIDGE__?: unknown }).__DDD_AGENT_BRIDGE__)
+      : dependencies.bridgeBinding;
+    if (!injected) return;
+    let timer = window.setTimeout(() => {
+      timer = 0;
+      const controller = new AbortController();
+      bootstrapAbort.current = controller;
+      void overlayHttpClient.recoverBridge(
+        injected,
+        { width: window.innerWidth, height: window.innerHeight },
+        controller.signal
+      ).then((recovery) => {
+        if (controller.signal.aborted) return;
+        bridgeRef.current = injected;
+        apply({ type: 'SESSION_ASSIGNED', sessionId: recovery.sessionId });
+        startTransport(recovery.sessionId, recovery.pageIdentity);
+        apply({
+          type: 'BRIDGE_RECOVERED',
+          pageIdentity: recovery.pageIdentity,
+          activeTarget: recovery.activeTarget
+        });
+      }).catch(() => {
+        if (!controller.signal.aborted) {
+          apply({ type: 'CONNECTION_CHANGED', connectionPhase: 'ERROR' });
+          apply({ type: 'SAFE_ERROR_SET', error: SAFE_CONNECTION_ERROR });
+        }
+      }).finally(() => {
+        if (bootstrapAbort.current === controller) bootstrapAbort.current = null;
+      });
+    }, 0);
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      bootstrapAbort.current?.abort();
+      bootstrapAbort.current = null;
+    };
+  }, [apply, dependencies.bridgeBinding, overlayHttpClient, startTransport]);
 
   const submit = useCallback(async (content: string) => {
     if (submitLock.current) return;
@@ -119,15 +171,64 @@ export function useAgentConversation(dependencies: AgentConversationDependencies
     }
   }, [apply, createId, dependencies, httpClient, startTransport]);
 
+  const clearOverlay = useCallback(() => {
+    apply({ type: 'OVERLAY_CLEARED_LOCAL' });
+  }, [apply]);
+
+  const observeTarget = useCallback((target: PublicOverlayTarget) => {
+    const current = stateRef.current;
+    const bridge = bridgeRef.current;
+    if (!bridge || current.observationPhase !== 'IDLE' || !current.activeTarget ||
+        current.activeTarget.targetId !== target.targetId ||
+        current.activeTarget.pageIdentity !== target.pageIdentity ||
+        current.activeTarget.sourceSnapshotId !== target.sourceSnapshotId ||
+        bridge.sessionId !== target.sessionId || bridge.pageIdentity !== target.pageIdentity ||
+        Date.parse(target.expiresAt) <= Date.now()) return;
+    const requestId = createId('observation-request');
+    const observation = {
+      requestId,
+      targetId: target.targetId,
+      pageIdentity: target.pageIdentity,
+      sourceSnapshotId: target.sourceSnapshotId
+    };
+    apply({ type: 'OBSERVATION_STARTED', observation });
+    const controller = new AbortController();
+    observationAbort.current?.abort();
+    observationAbort.current = controller;
+    void overlayHttpClient.observeClick(bridge, {
+      requestId,
+      targetId: target.targetId,
+      sourceSnapshotId: target.sourceSnapshotId,
+      observationType: 'USER_CLICK',
+      clientOccurredAt: new Date().toISOString()
+    }, controller.signal).then((ack) => {
+      if (!controller.signal.aborted) {
+        apply({ type: 'OBSERVATION_ACKNOWLEDGED', requestId: ack.requestId, targetId: ack.targetId });
+      }
+    }).catch(() => {
+      if (!controller.signal.aborted) {
+        apply({ type: 'OBSERVATION_FAILED', requestId });
+        apply({ type: 'SAFE_ERROR_SET', error: SAFE_RESPONSE_ERROR });
+      }
+    }).finally(() => {
+      if (observationAbort.current === controller) observationAbort.current = null;
+    });
+  }, [apply, createId, overlayHttpClient]);
+
   const reconnect = useCallback(() => {
-    if (stateRef.current.sessionId) startTransport(stateRef.current.sessionId);
+    if (stateRef.current.sessionId) {
+      startTransport(stateRef.current.sessionId, stateRef.current.pageIdentity ?? undefined);
+    }
     else apply({ type: 'SAFE_ERROR_SET', error: SAFE_CONNECTION_ERROR });
   }, [apply, startTransport]);
 
   useEffect(() => () => {
     requestAbort.current?.abort();
+    bootstrapAbort.current?.abort();
+    observationAbort.current?.abort();
+    bridgeRef.current = null;
     stopTransport();
   }, [stopTransport]);
 
-  return { state, dispatch: apply, submit, reconnect };
+  return { state, dispatch: apply, submit, reconnect, clearOverlay, observeTarget };
 }

@@ -5,6 +5,12 @@ import type {
   ConversationSnapshot,
   ConversationWorkflowStatus
 } from '../model/conversation-types';
+import {
+  parseOverlayClearEvent,
+  parseOverlayTargetEvent,
+  parseUserActionObservedEvent,
+  type OverlayParseContext
+} from './overlay-contract';
 
 export const SAFE_AI_RESPONSE_ERROR = 'AI 응답을 처리하지 못했습니다. 다시 시도해 주세요.';
 
@@ -133,8 +139,20 @@ export function parseConversationSnapshot(payload: unknown): ConversationSnapsho
   };
 }
 
-export function parseConversationEvent(payload: unknown): ConversationServerEvent | null {
+export function parseConversationEvent(
+  payload: unknown,
+  overlayContext?: OverlayParseContext
+): ConversationServerEvent | null {
   const item = record(payload);
+  if (item?.eventType === 'OVERLAY_TARGET') {
+    return overlayContext ? parseOverlayTargetEvent(item, overlayContext) : null;
+  }
+  if (item?.eventType === 'OVERLAY_CLEAR') {
+    return overlayContext ? parseOverlayClearEvent(item, overlayContext) : null;
+  }
+  if (item?.eventType === 'USER_ACTION_OBSERVED') {
+    return overlayContext ? parseUserActionObservedEvent(item, overlayContext) : null;
+  }
   if (!item || !text(item.eventId, 128) || !positive(item.eventSequence) ||
       !text(item.sessionId, 128) || !status(item.workflowStatus) ||
       !text(item.occurredAt, 64) || !text(item.messageId, 128)) return null;

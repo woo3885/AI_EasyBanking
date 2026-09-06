@@ -72,6 +72,13 @@ describe('conversationReducer', () => {
     expect(state.lastEventSequence).toBe(0);
   });
 
+  it('duplicate ACK는 이미 대기 중인 상태를 다시 변경하지 않는다', () => {
+    const acknowledged = conversationReducer(submit(), { type: 'MESSAGE_ACKNOWLEDGED', requestId: 'request-1',
+      messageId: 'local-message-1', acceptedSequence: 3 });
+    expect(conversationReducer(acknowledged, { type: 'MESSAGE_ACKNOWLEDGED', requestId: 'request-1',
+      messageId: 'local-message-1', acceptedSequence: 4 })).toBe(acknowledged);
+  });
+
   it('event sequence와 message sequence를 독립적으로 보존한다', () => {
     const state = conversationReducer(withSession(), { type: 'SERVER_EVENT_RECEIVED', event: aiMessage(9, 2) });
     expect(state.lastEventSequence).toBe(9);

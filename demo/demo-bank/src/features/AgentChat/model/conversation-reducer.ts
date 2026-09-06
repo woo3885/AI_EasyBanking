@@ -9,6 +9,7 @@ import {
   type ConversationServerEvent,
   type ConversationState
 } from './conversation-types';
+import { overlayTargetFromEvent } from '../api/overlay-contract';
 
 const MAX_SEEN_EVENT_IDS = 200;
 
@@ -32,7 +33,12 @@ function toActiveQuestion(event: AiQuestionEvent): ActiveConversationQuestion {
 }
 
 function toMessage(event: ConversationServerEvent): ConversationMessage | null {
-  if (event.eventType === 'USER_MESSAGE_ACCEPTED') return null;
+  if (
+    event.eventType === 'USER_MESSAGE_ACCEPTED' ||
+    event.eventType === 'OVERLAY_TARGET' ||
+    event.eventType === 'OVERLAY_CLEAR' ||
+    event.eventType === 'USER_ACTION_OBSERVED'
+  ) return null;
   if (event.eventType === 'AI_QUESTION') {
     return {
       messageId: event.messageId,
@@ -67,14 +73,52 @@ function applyServerEvent(state: ConversationState, event: ConversationServerEve
   const common = {
     lastEventSequence: event.eventSequence,
     seenEventIds: rememberEvent(state, event.eventId),
-    workflowStatus: event.workflowStatus,
     safeError: null
   };
+
+  if (event.eventType === 'OVERLAY_TARGET') {
+    if (state.pageIdentity !== event.pageIdentity) return state;
+    return {
+      ...state,
+      ...common,
+      workflowStatus: event.workflowStatus,
+      activeTarget: overlayTargetFromEvent(event),
+      observationPhase: 'IDLE',
+      pendingObservation: null
+    };
+  }
+
+  if (event.eventType === 'OVERLAY_CLEAR') {
+    const matches = state.activeTarget?.targetId === event.targetId &&
+      state.activeTarget.pageIdentity === event.pageIdentity &&
+      state.activeTarget.sourceSnapshotId === event.sourceSnapshotId;
+    return {
+      ...state,
+      ...common,
+      activeTarget: matches ? null : state.activeTarget
+    };
+  }
+
+  if (event.eventType === 'USER_ACTION_OBSERVED') {
+    const matches = state.pendingObservation?.requestId === event.requestId &&
+      state.pendingObservation.targetId === event.targetId &&
+      state.pendingObservation.pageIdentity === event.pageIdentity &&
+      state.pendingObservation.sourceSnapshotId === event.sourceSnapshotId;
+    return {
+      ...state,
+      ...common,
+      workflowStatus: matches ? event.workflowStatus : state.workflowStatus,
+      activeTarget: matches ? null : state.activeTarget,
+      observationPhase: matches ? 'IDLE' : state.observationPhase,
+      pendingObservation: matches ? null : state.pendingObservation
+    };
+  }
 
   if (event.eventType === 'USER_MESSAGE_ACCEPTED') {
     return {
       ...state,
       ...common,
+      workflowStatus: event.workflowStatus,
       messages: state.messages.map((message) =>
         message.messageId === event.messageId && message.role === 'USER'
           ? { ...message, sequence: event.acceptedSequence }
@@ -92,14 +136,24 @@ function applyServerEvent(state: ConversationState, event: ConversationServerEve
   return {
     ...state,
     ...common,
+    workflowStatus: event.workflowStatus,
     messages,
     conversationSequence: Math.max(state.conversationSequence, event.sequence),
     goalRevision: Math.max(state.goalRevision, event.goalRevision),
     activeQuestion: event.eventType === 'AI_QUESTION' ? toActiveQuestion(event) : state.activeQuestion,
+    activeTarget: isOverlayBlockedStatus(event.workflowStatus) ? null : state.activeTarget,
+    observationPhase: isOverlayBlockedStatus(event.workflowStatus) ? 'IDLE' : state.observationPhase,
+    pendingObservation: isOverlayBlockedStatus(event.workflowStatus) ? null : state.pendingObservation,
     submitPhase: 'IDLE',
     pendingRequestId: null,
     pendingMessageId: null
   };
+}
+
+function isOverlayBlockedStatus(status: ConversationState['workflowStatus']) {
+  return status === 'SECURE_INPUT_REQUIRED' || status === 'RISK_WARNING' ||
+    status === 'FINAL_CONFIRMATION_REQUIRED' || status === 'COMPLETED' ||
+    status === 'CANCELLED' || status === 'ERROR' || status === 'TERMINATED';
 }
 
 export function conversationReducer(state: ConversationState, action: ConversationAction): ConversationState {
@@ -113,7 +167,7 @@ export function conversationReducer(state: ConversationState, action: Conversati
       };
     case 'SESSION_ASSIGNED':
       return state.sessionId && state.sessionId !== action.sessionId
-        ? state
+        ? { ...createInitialConversationState(state.connectionPhase), sessionId: action.sessionId }
         : { ...state, sessionId: action.sessionId };
     case 'MESSAGE_SUBMIT_STARTED': {
       const validation = validateChatMessage(action.message.text, {
@@ -141,7 +195,8 @@ export function conversationReducer(state: ConversationState, action: Conversati
         ? { ...state, submitPhase: 'WAITING_FOR_ACK' }
         : state;
     case 'MESSAGE_ACKNOWLEDGED':
-      if (state.pendingRequestId !== action.requestId || state.pendingMessageId !== action.messageId) return state;
+      if ((state.submitPhase !== 'SUBMITTING' && state.submitPhase !== 'WAITING_FOR_ACK') ||
+          state.pendingRequestId !== action.requestId || state.pendingMessageId !== action.messageId) return state;
       return {
         ...state,
         messages: state.messages.map((message) =>
@@ -187,6 +242,9 @@ export function conversationReducer(state: ConversationState, action: Conversati
         conversationSequence: snapshot.conversationSequence,
         goalRevision: snapshot.goalRevision,
         activeQuestion: snapshot.activeQuestion,
+        activeTarget: isOverlayBlockedStatus(snapshot.workflowStatus) ? null : state.activeTarget,
+        observationPhase: isOverlayBlockedStatus(snapshot.workflowStatus) ? 'IDLE' : state.observationPhase,
+        pendingObservation: isOverlayBlockedStatus(snapshot.workflowStatus) ? null : state.pendingObservation,
         workflowStatus: snapshot.workflowStatus,
         submitPhase: snapshot.activeQuestion || snapshot.recentSafeMessages.some((message) => message.role === 'AI')
           ? 'IDLE'
@@ -194,8 +252,46 @@ export function conversationReducer(state: ConversationState, action: Conversati
         safeError: null
       };
     }
+    case 'BRIDGE_RECOVERED':
+      return {
+        ...state,
+        pageIdentity: action.pageIdentity,
+        activeTarget: action.activeTarget,
+        observationPhase: 'IDLE',
+        pendingObservation: null
+      };
+    case 'OVERLAY_CLEARED_LOCAL':
+      return {
+        ...state,
+        activeTarget: null,
+        observationPhase: 'IDLE',
+        pendingObservation: null
+      };
+    case 'OBSERVATION_STARTED':
+      if (!state.activeTarget || state.observationPhase !== 'IDLE' ||
+          state.activeTarget.targetId !== action.observation.targetId ||
+          state.activeTarget.pageIdentity !== action.observation.pageIdentity ||
+          state.activeTarget.sourceSnapshotId !== action.observation.sourceSnapshotId) return state;
+      return { ...state, observationPhase: 'SUBMITTING', pendingObservation: action.observation };
+    case 'OBSERVATION_ACKNOWLEDGED':
+      return state.pendingObservation?.requestId === action.requestId &&
+        state.pendingObservation.targetId === action.targetId
+        ? { ...state, observationPhase: 'WAITING_FOR_RESULT' }
+        : state;
+    case 'OBSERVATION_FAILED':
+      return state.pendingObservation?.requestId === action.requestId
+        ? { ...state, observationPhase: 'ERROR', pendingObservation: null }
+        : state;
     case 'CONNECTION_CHANGED':
-      return { ...state, connectionPhase: action.connectionPhase };
+      return action.connectionPhase === 'CONNECTED'
+        ? { ...state, connectionPhase: action.connectionPhase }
+        : {
+            ...state,
+            connectionPhase: action.connectionPhase,
+            activeTarget: null,
+            observationPhase: 'IDLE',
+            pendingObservation: null
+          };
     case 'CONVERSATION_RESET':
       return createInitialConversationState(state.connectionPhase);
     default:

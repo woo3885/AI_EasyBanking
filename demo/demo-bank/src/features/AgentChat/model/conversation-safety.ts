@@ -3,6 +3,7 @@ import type { ConversationState } from './conversation-types';
 const BLOCKED_WORKFLOW_STATUSES = new Set([
   'SECURE_INPUT_REQUIRED',
   'RISK_WARNING',
+  'FINAL_CONFIRMATION_REQUIRED',
   'COMPLETED',
   'CANCELLED',
   'ERROR',

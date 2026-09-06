@@ -1,3 +1,14 @@
+import type {
+  OverlayActionMode,
+  OverlayClearReason,
+  OverlayCoordinateSpace,
+  OverlayObservationPhase,
+  OverlayRectangle,
+  OverlayViewport,
+  PendingOverlayObservation,
+  PublicOverlayTarget
+} from './overlay-types';
+
 export type ConversationRole = 'USER' | 'AI';
 export type ConversationMessageKind = 'MESSAGE' | 'QUESTION' | 'STATUS' | 'WARNING';
 
@@ -89,6 +100,10 @@ export interface ConversationState {
   pendingMessageId: string | null;
   safeError: ConversationSafeError | null;
   connectionPhase: ConversationConnectionPhase;
+  pageIdentity: string | null;
+  activeTarget: PublicOverlayTarget | null;
+  observationPhase: OverlayObservationPhase;
+  pendingObservation: PendingOverlayObservation | null;
 }
 
 export interface ConversationSnapshot {
@@ -138,7 +153,53 @@ export interface AiMessageEvent extends ConversationEventBase {
   errorCode: string | null;
 }
 
-export type ConversationServerEvent = UserMessageAcceptedEvent | AiQuestionEvent | AiMessageEvent;
+export interface OverlayTargetEvent extends ConversationEventBase {
+  eventType: 'OVERLAY_TARGET';
+  workflowStatus: 'USER_DECISION_REQUIRED';
+  targetId: string;
+  pageIdentity: string;
+  sourceSnapshotId: string;
+  coordinateSpace: OverlayCoordinateSpace;
+  rectangle: OverlayRectangle;
+  viewport: OverlayViewport;
+  role: string;
+  label: string;
+  guide: string;
+  actionMode: OverlayActionMode;
+  expiresAt: string;
+}
+
+export interface OverlayClearEvent {
+  eventId: string;
+  eventSequence: number;
+  eventType: 'OVERLAY_CLEAR';
+  sessionId: string;
+  targetId: string;
+  pageIdentity: string;
+  sourceSnapshotId: string;
+  reason: OverlayClearReason;
+  occurredAt: string;
+}
+
+export interface UserActionObservedEvent extends ConversationEventBase {
+  eventType: 'USER_ACTION_OBSERVED';
+  workflowStatus: 'AI_EXECUTING';
+  observationId: string;
+  requestId: string;
+  targetId: string;
+  pageIdentity: string;
+  sourceSnapshotId: string;
+  resultingSnapshotId: string;
+  status: 'DOM_CHANGE_CONFIRMED';
+}
+
+export type ConversationServerEvent =
+  | UserMessageAcceptedEvent
+  | AiQuestionEvent
+  | AiMessageEvent
+  | OverlayTargetEvent
+  | OverlayClearEvent
+  | UserActionObservedEvent;
 
 export type ConversationAction =
   | { type: 'DRAFT_CHANGED'; draft: string }
@@ -150,6 +211,11 @@ export type ConversationAction =
   | { type: 'MESSAGE_SUBMIT_FAILED'; requestId: string }
   | { type: 'SAFE_ERROR_SET'; error: ConversationSafeError }
   | { type: 'SNAPSHOT_RESTORED'; snapshot: ConversationSnapshot }
+  | { type: 'BRIDGE_RECOVERED'; pageIdentity: string; activeTarget: PublicOverlayTarget | null }
+  | { type: 'OVERLAY_CLEARED_LOCAL' }
+  | { type: 'OBSERVATION_STARTED'; observation: PendingOverlayObservation }
+  | { type: 'OBSERVATION_ACKNOWLEDGED'; requestId: string; targetId: string }
+  | { type: 'OBSERVATION_FAILED'; requestId: string }
   | { type: 'CONNECTION_CHANGED'; connectionPhase: ConversationConnectionPhase }
   | { type: 'CONVERSATION_RESET' };
 
@@ -170,6 +236,10 @@ export function createInitialConversationState(
     pendingRequestId: null,
     pendingMessageId: null,
     safeError: null,
-    connectionPhase
+    connectionPhase,
+    pageIdentity: null,
+    activeTarget: null,
+    observationPhase: 'IDLE',
+    pendingObservation: null
   };
 }
