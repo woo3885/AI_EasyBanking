@@ -21,8 +21,12 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import java.time.Instant;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -44,7 +48,17 @@ class ConversationNavigationCoordinatorProductionTest {
         state.applyGoalPatch(state.goal().goalId(), 0, "message-1",
                 new UserGoalPatch(0, "DEPOSIT", new UserGoal.Amount("1000000", "KRW"),
                         new UserGoal.Duration(12, "MONTH"), List.of(), null, null), null);
-        var events = new ConversationEventPublisher(eventStore, mock(SimpMessagingTemplate.class));
+        AtomicReference<WorkflowStatus> statusAtNavigationEvent = new AtomicReference<>();
+        var messaging = mock(SimpMessagingTemplate.class);
+        doAnswer(invocation -> {
+            Object payload = invocation.getArgument(1);
+            if (payload instanceof ConversationEvent event
+                    && event.eventType().equals("NAVIGATION_REQUIRED")) {
+                statusAtNavigationEvent.set(sessions.findById(sessionId).orElseThrow().getStatus());
+            }
+            return null;
+        }).when(messaging).convertAndSend(anyString(), any(Object.class));
+        var events = new ConversationEventPublisher(eventStore, messaging);
         var userBindings = new UserBrowserBridgeRegistry();
         userBindings.put(new UserBrowserBridgeBinding(sessionId, "binding-1", "token-1", "page-1",
                 null, "https://frontend.example", Instant.now().plusSeconds(600)));
@@ -80,6 +94,7 @@ class ConversationNavigationCoordinatorProductionTest {
 
         assertThat(sessions.findById(sessionId).orElseThrow().getStatus())
                 .isEqualTo(WorkflowStatus.PAGE_LOADING);
+        assertThat(statusAtNavigationEvent).hasValue(WorkflowStatus.PAGE_LOADING);
         assertThat(eventStore.events(sessionId).stream()
                 .filter(event -> event.eventType().equals("NAVIGATION_REQUIRED")))
                 .hasSize(1);
