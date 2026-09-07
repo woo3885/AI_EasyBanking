@@ -55,17 +55,27 @@ export class ProductionConversationModel implements ConversationModelPort {
   ) {}
 
   async decide(input: ConversationAgentRequest): Promise<AgentDecision> {
+    const deterministic = await this.fallback.decide(input);
     try {
       const model = new GeminiConversationModel(async ({ prompt }) =>
         this.transport({ prompt: prompt + trustedBindings(input) })
       );
-      return await model.decide(input);
+      const geminiDecision = await model.decide(input);
+
+      // Gemini participates in every turn, but Backend-owned question answers
+      // and DOM/protection decisions remain deterministic. This canonicalizes
+      // expressions such as "1년" to 12 MONTH and prevents a model response
+      // from replacing the current snapshot's safety policy.
+      if (input.goal.pendingQuestion !== null || input.snapshot !== null) {
+        return deterministic;
+      }
+      return geminiDecision;
     } catch (error) {
       console.error(
         "[AI Engine] Gemini conversation failed contract validation. Scripted fallback is returned.",
         error instanceof Error ? error.name : "UnknownError",
       );
-      return this.fallback.decide(input);
+      return deterministic;
     }
   }
 }
