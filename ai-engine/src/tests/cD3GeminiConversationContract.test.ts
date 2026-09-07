@@ -71,6 +71,48 @@ test("production conversation fails closed to the scripted model", async () => {
   assert.deepEqual(await model.decide(input), expected);
 });
 
+test("production conversation calls Gemini and canonicalizes a one-year follow-up", async () => {
+  const input = request("03");
+  input.snapshot = null;
+  input.goal.intent = "DEPOSIT";
+  input.goal.amount = { value: "1000000", currency: "KRW" };
+  input.goal.duration = null;
+  input.goal.missingFields = ["duration"];
+  input.goal.pendingQuestion = { questionId: "question-year", fieldKey: "duration" };
+  input.userMessage = { content: "1년", answerToQuestionId: "question-year" };
+  const unsafeMonthDecision: AgentDecision = {
+    requestId: input.requestId,
+    requestMessageId: input.requestMessageId,
+    goalId: input.goal.goalId,
+    baseGoalRevision: input.goal.revision,
+    mode: "GOAL_PATCH_PROPOSED",
+    message: null,
+    confidence: 1,
+    reasonCode: "GOAL_UPDATED",
+    nextCondition: "LATEST_DOM_DECISION",
+    sourceSnapshotId: null,
+    goalPatch: {
+      basedOnRevision: input.goal.revision,
+      duration: { value: 1, unit: "MONTH" },
+      missingFields: [],
+      pendingQuestionFieldKey: null,
+    },
+    question: null,
+    actionCandidate: null,
+    navigationCandidate: null,
+  };
+  let calls = 0;
+  const model = new ProductionConversationModel(async () => {
+    calls += 1;
+    return JSON.stringify(unsafeMonthDecision);
+  });
+
+  const actual = await model.decide(input);
+
+  assert.equal(calls, 1);
+  assert.deepEqual(actual.goalPatch?.duration, { value: 12, unit: "MONTH" });
+});
+
 test("C-D3-GEMINI-02 rejects an unknown mode", async () => {
   const { request: input, decision } = await scriptedDecision("03");
   await rejectsContract(input, { ...decision, mode: "ROOT_OVERRIDE" });
