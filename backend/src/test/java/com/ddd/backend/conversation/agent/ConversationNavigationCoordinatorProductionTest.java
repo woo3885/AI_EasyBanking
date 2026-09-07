@@ -47,7 +47,7 @@ class ConversationNavigationCoordinatorProductionTest {
         var events = new ConversationEventPublisher(eventStore, mock(SimpMessagingTemplate.class));
         var userBindings = new UserBrowserBridgeRegistry();
         userBindings.put(new UserBrowserBridgeBinding(sessionId, "binding-1", "token-1", "page-1",
-                "/transfer/accounts", "https://frontend.example", Instant.now().plusSeconds(600)));
+                null, "https://frontend.example", Instant.now().plusSeconds(600)));
         @SuppressWarnings("unchecked") ObjectProvider<BrowserPageReadyResumePort> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(mock(BrowserPageReadyResumePort.class));
         var navigationService = new BrowserNavigationService(sessions, userBindings,
