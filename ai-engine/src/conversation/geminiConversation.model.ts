@@ -30,7 +30,10 @@ export class GeminiConversationContractError extends Error {
  * Production routing stays scripted until an explicitly configured transport is wired.
  */
 export class GeminiConversationModel implements ConversationModelPort {
-  constructor(private readonly transport: GeminiConversationTransport) {}
+  constructor(
+    private readonly transport: GeminiConversationTransport,
+    private readonly bindBackendAuthority = false,
+  ) {}
 
   async decide(input: ConversationAgentRequest): Promise<AgentDecision> {
     const raw = await this.transport({
@@ -45,6 +48,19 @@ export class GeminiConversationModel implements ConversationModelPort {
         "INVALID_JSON",
         "Gemini conversation output was not valid JSON.",
       );
+    }
+
+    if (
+      this.bindBackendAuthority && candidate !== null &&
+      typeof candidate === "object" && !Array.isArray(candidate)
+    ) {
+      candidate = {
+        ...(candidate as Record<string, unknown>),
+        requestId: input.requestId,
+        requestMessageId: input.requestMessageId,
+        goalId: input.goal.goalId,
+        baseGoalRevision: input.goal.revision,
+      };
     }
 
     const validation = validateConversationInteractionDecision(input, candidate);

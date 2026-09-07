@@ -49,6 +49,24 @@ test("C-D3-GEMINI-01 accepts a valid ConversationAgentRequest -> AgentDecision r
   assert.match(prompts[0] ?? "", /BEGIN_UNTRUSTED_DATA_JSON/u);
 });
 
+test("production binding replaces model-authored Backend authority fields", async () => {
+  const { request: input, decision } = await scriptedDecision("03");
+  const model = new GeminiConversationModel(async () => JSON.stringify({
+    ...decision,
+    requestId: "model-request",
+    requestMessageId: "model-message",
+    goalId: "model-goal",
+    baseGoalRevision: 999,
+  }), true);
+
+  const actual = await model.decide(input);
+
+  assert.equal(actual.requestId, input.requestId);
+  assert.equal(actual.requestMessageId, input.requestMessageId);
+  assert.equal(actual.goalId, input.goal.goalId);
+  assert.equal(actual.baseGoalRevision, input.goal.revision);
+});
+
 test("production conversation uses the Gemini decision for flexible wording", async () => {
   const input = request("03");
   input.userMessage.content = "백만 원 정도를 예금으로 굴리고 싶어요";
