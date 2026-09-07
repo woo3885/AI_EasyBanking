@@ -186,7 +186,7 @@ public final class ConversationAgentCoordinator {
             if (navigationAdapter == null) {
                 throw new IllegalStateException("Conversation navigation adapter가 준비되지 않았습니다.");
             }
-            navigationAdapter.start(sessionId, state, decision);
+            navigationAdapter.start(sessionId, state, decision, snapshot);
         }
         session.transitionTo(status);
         sessions.save(session);
