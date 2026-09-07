@@ -11,7 +11,8 @@ import {
   validateConversationInteractionDecision,
 } from "../conversation/conversationInteraction.policy.js";
 
-const MODEL_TIMEOUT_MS = 5_000;
+// Stay below Backend's 15 second upstream timeout while allowing one retry.
+const MODEL_TIMEOUT_MS = 12_000;
 
 export function createConversationDecisionRouter(
   model: ConversationModelPort = new ScriptedConversationModel(),
