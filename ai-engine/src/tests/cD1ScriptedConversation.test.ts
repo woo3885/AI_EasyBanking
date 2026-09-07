@@ -47,6 +47,17 @@ test("C-D1-03 unknown input safely stops without a DOM action", async () => {
   assert.equal(validateAgentDecision(decision).valid, true);
 });
 
+test("deposit product lookup enters the deposit workflow before generic inquiry", async () => {
+  const decision = await new ScriptedConversationModel().decide(
+    request("예금 상품 알아보기"),
+  );
+
+  assert.equal(decision.mode, "ASK_USER");
+  assert.equal(decision.goalPatch?.intent, "DEPOSIT");
+  assert.deepEqual(decision.goalPatch?.missingFields, ["amount", "duration"]);
+  assert.deepEqual(decision.question, { fieldKey: "amount" });
+});
+
 test("C-D1-03 pending duration proposes a deterministic goal patch", async () => {
   const input = request("12개월");
   input.goal.intent = "DEPOSIT";

@@ -164,6 +164,38 @@ test("production conversation calls Gemini and canonicalizes a one-year follow-u
   assert.deepEqual(actual.goalPatch?.duration, { value: 12, unit: "MONTH" });
 });
 
+test("production conversation normalizes deposit lookup over Gemini inquiry", async () => {
+  const input = unknownInitial("예금 상품 알아보기");
+  const model = new ProductionConversationModel(async () => JSON.stringify({
+    requestId: input.requestId,
+    requestMessageId: input.requestMessageId,
+    goalId: input.goal.goalId,
+    baseGoalRevision: input.goal.revision,
+    mode: "GOAL_PATCH_PROPOSED",
+    message: null,
+    confidence: 1,
+    reasonCode: "GOAL_UPDATED",
+    nextCondition: "LATEST_DOM_DECISION",
+    sourceSnapshotId: null,
+    goalPatch: {
+      basedOnRevision: input.goal.revision,
+      intent: "INQUIRY",
+      missingFields: [],
+      pendingQuestionFieldKey: null,
+    },
+    question: null,
+    actionCandidate: null,
+    navigationCandidate: null,
+  }));
+
+  const actual = await model.decide(input);
+
+  assert.equal(actual.mode, "ASK_USER");
+  assert.equal(actual.goalPatch?.intent, "DEPOSIT");
+  assert.deepEqual(actual.goalPatch?.missingFields, ["amount", "duration"]);
+  assert.deepEqual(actual.question, { fieldKey: "amount" });
+});
+
 test("C-D3-GEMINI-02 rejects an unknown mode", async () => {
   const { request: input, decision } = await scriptedDecision("03");
   await rejectsContract(input, { ...decision, mode: "ROOT_OVERRIDE" });

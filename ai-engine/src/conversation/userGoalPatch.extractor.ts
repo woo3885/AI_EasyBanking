@@ -70,8 +70,10 @@ export function normalizeDuration(message: string): GoalDuration | null {
 function detectIntent(message: string): GoalIntent {
   if (/(?:변경|바꿔|고쳐)/u.test(message)) return "CHANGE";
   if (/(?:이체|송금)/u.test(message)) return "TRANSFER";
-  if (/(?:조회|알아보|확인)/u.test(message)) return "INQUIRY";
+  // A named financial workflow wins over a generic lookup verb. For example,
+  // "예금 상품 알아보기" must enter the deposit flow, not generic inquiry.
   if (/(?:예금|적금)/u.test(message)) return "DEPOSIT";
+  if (/(?:조회|알아보|확인)/u.test(message)) return "INQUIRY";
   return "UNKNOWN";
 }
 
