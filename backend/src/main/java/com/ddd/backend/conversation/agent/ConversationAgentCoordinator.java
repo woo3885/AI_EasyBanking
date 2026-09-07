@@ -115,6 +115,8 @@ public final class ConversationAgentCoordinator {
                     decision = result.decision();
                     applyDomDecision(sessionId, state, session, decision, result.snapshot());
                 }
+            } else if (decision.mode() == ConversationInteractionMode.STOP) {
+                applyDomDecision(sessionId, state, session, decision, null);
             } else {
                 throw new IllegalArgumentException("Unsupported conversation decision mode");
             }
