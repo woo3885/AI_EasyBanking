@@ -186,10 +186,15 @@ public final class ConversationAgentCoordinator {
             if (navigationAdapter == null) {
                 throw new IllegalStateException("Conversation navigation adapter가 준비되지 않았습니다.");
             }
+            // The browser can acknowledge NAVIGATION_REQUIRED immediately. Persist PAGE_LOADING
+            // before publishing that event so page-ready never observes the previous AI_EXECUTING state.
+            session.transitionTo(status);
+            sessions.save(session);
             navigationAdapter.start(sessionId, state, decision, snapshot);
+        } else {
+            session.transitionTo(status);
+            sessions.save(session);
         }
-        session.transitionTo(status);
-        sessions.save(session);
         if (decision.message() != null && !decision.message().isBlank()) {
             Instant now = Instant.now();
             String assistantMessageId = UUID.randomUUID().toString();
