@@ -10,6 +10,7 @@ import {
   type GeminiConversationTransport,
 } from "./geminiConversation.model.js";
 import type { ConversationModelPort } from "./conversationModel.port.js";
+import { createConversationPrompt } from "./conversationPrompt.builder.js";
 import { ScriptedConversationModel } from "./scriptedConversation.model.js";
 
 async function generateGeminiConversationText(
@@ -58,26 +59,26 @@ export class ProductionConversationModel implements ConversationModelPort {
   async decide(input: ConversationAgentRequest): Promise<AgentDecision> {
     const deterministic = await this.fallback.decide(input);
     try {
-      const model = new GeminiConversationModel(
-        async ({ prompt }) =>
-          this.transport({ prompt: prompt + trustedBindings(input) }),
-        true,
-      );
-      const geminiDecision = await model.decide(input);
+      const prompt = createConversationPrompt(input) + trustedBindings(input);
 
-      // Gemini participates in every turn, but Backend-owned question answers
-      // and DOM/protection decisions remain deterministic. This canonicalizes
-      // expressions such as "1년" to 12 MONTH and prevents a model response
-      // from replacing the current snapshot's safety policy.
+      // Gemini observes every turn. Pending answers and DOM/protection turns
+      // are interpreted by authoritative deterministic policy, so the model's
+      // untrusted action proposal is deliberately not materialized.
       if (input.goal.pendingQuestion !== null || input.snapshot !== null) {
+        await this.transport({ prompt });
         return deterministic;
       }
-      return geminiDecision;
+
+      const model = new GeminiConversationModel(
+        async () => this.transport({ prompt }),
+        true,
+      );
+      return await model.decide(input);
     } catch (error) {
       console.error(
         "[AI Engine] Gemini conversation failed contract validation. Scripted fallback is returned.",
         error instanceof GeminiConversationContractError
-          ? `${error.name}:${error.code}`
+          ? `${error.name}:${error.code}:${error.message}`
           : error instanceof Error ? error.name : "UnknownError",
       );
       return deterministic;

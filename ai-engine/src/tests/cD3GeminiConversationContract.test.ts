@@ -17,6 +17,24 @@ function request(id: string): ConversationAgentRequest {
   return structuredClone(fixture.request);
 }
 
+function unknownInitial(content: string): ConversationAgentRequest {
+  const input = request("03");
+  input.snapshot = null;
+  input.goal = {
+    ...input.goal,
+    intent: "UNKNOWN",
+    normalizedRequest: content,
+    amount: null,
+    duration: null,
+    missingFields: [],
+    pendingQuestion: null,
+    stage: "INFORMATION_COLLECTION",
+    lastAppliedMessageId: null,
+  };
+  input.userMessage = { content, answerToQuestionId: null };
+  return input;
+}
+
 async function scriptedDecision(id: string): Promise<{ request: ConversationAgentRequest; decision: AgentDecision }> {
   const input = request(id);
   return { request: input, decision: await new ScriptedConversationModel().decide(input) };
@@ -68,9 +86,11 @@ test("production binding replaces model-authored Backend authority fields", asyn
 });
 
 test("production conversation uses the Gemini decision for flexible wording", async () => {
-  const input = request("03");
-  input.userMessage.content = "백만 원 정도를 예금으로 굴리고 싶어요";
-  const expected = await new ScriptedConversationModel().decide(request("03"));
+  const input = unknownInitial("목돈을 한동안 안전하게 굴리고 싶어요");
+  const canonical = structuredClone(input);
+  canonical.goal.normalizedRequest = "100만원으로 예금 가입해줘";
+  canonical.userMessage.content = "100만원으로 예금 가입해줘";
+  const expected = await new ScriptedConversationModel().decide(canonical);
   const prompts: string[] = [];
   const model = new ProductionConversationModel(async ({ prompt }) => {
     prompts.push(prompt);
@@ -82,7 +102,7 @@ test("production conversation uses the Gemini decision for flexible wording", as
 });
 
 test("production conversation fails closed to the scripted model", async () => {
-  const input = request("03");
+  const input = unknownInitial("알아들을 수 없는 자유 입력");
   const expected = await new ScriptedConversationModel().decide(input);
   const model = new ProductionConversationModel(async () => "not-json");
 
