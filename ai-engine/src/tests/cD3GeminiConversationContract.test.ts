@@ -90,11 +90,24 @@ test("production conversation uses the Gemini decision for flexible wording", as
   const canonical = structuredClone(input);
   canonical.goal.normalizedRequest = "100만원으로 예금 가입해줘";
   canonical.userMessage.content = "100만원으로 예금 가입해줘";
-  const expected = await new ScriptedConversationModel().decide(canonical);
+  const expected = {
+    ...await new ScriptedConversationModel().decide(canonical),
+    message: "가입 기간을 개월 단위로 알려 주세요.",
+  };
   const prompts: string[] = [];
   const model = new ProductionConversationModel(async ({ prompt }) => {
     prompts.push(prompt);
-    return JSON.stringify(expected);
+    return JSON.stringify({
+      ...expected,
+      mode: "NAVIGATION_REQUIRED",
+      message: "예금 화면으로 이동합니다.",
+      question: null,
+      navigationCandidate: {
+        decisionId: "model-invented-navigation",
+        semanticRoute: "DEPOSIT_PRODUCTS",
+        navigationMode: "SPA_PUSH",
+      },
+    });
   });
 
   assert.deepEqual(await model.decide(input), expected);
