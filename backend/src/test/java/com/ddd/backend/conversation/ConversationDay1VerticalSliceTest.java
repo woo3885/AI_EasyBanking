@@ -16,6 +16,33 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 class ConversationDay1VerticalSliceTest {
     @Test
+    void unsupportedInitialRequestStopsSafelyInsteadOfFailingTheSession() {
+        var sessions = new InMemoryAutomationSessionRepository();
+        AutomationSession session = sessions.save(AutomationSession.create("지원하지 않는 요청"));
+        var states = new ConversationStateStore(Duration.ofMinutes(30));
+        var mailbox = new SessionMessageMailbox();
+        var events = new ConversationEventStore();
+        var conversations = new ConversationService(sessions, states, mailbox,
+                new ConversationMessagePolicy(), events);
+        ConversationAgentClient stop = request -> new ConversationAgentDecision(
+                request.requestId(), request.requestMessageId(), request.goal().goalId(), 0,
+                ConversationInteractionMode.STOP, "현재 지원하지 않는 요청입니다.", 1.0,
+                "UNSUPPORTED_REQUEST", null, null, null, null, null);
+        var coordinator = new ConversationAgentCoordinator(conversations, mailbox, sessions, stop,
+                new ConversationAgentContractValidator(new ConversationMessagePolicy()),
+                new ConversationEventPublisher(events, mock(SimpMessagingTemplate.class)));
+        MessageAcceptance accepted = conversations.acceptInitial(session.getSessionId(),
+                "request-stop", "message-stop", "지원하지 않는 요청", null);
+
+        coordinator.process(session.getSessionId(), accepted, "지원하지 않는 요청", null);
+
+        ConversationSnapshot snapshot = conversations.snapshot(session.getSessionId());
+        assertThat(snapshot.workflowStatus()).isEqualTo(WorkflowStatus.TERMINATED);
+        assertThat(snapshot.recentSafeMessages()).extracting(ConversationMessage::content)
+                .contains("현재 지원하지 않는 요청입니다.");
+    }
+
+    @Test
     void completeInitialRequestAppliesPatchWithoutClearingAbsentQuestion() {
         var sessions = new InMemoryAutomationSessionRepository();
         AutomationSession session = sessions.save(AutomationSession.create("100만원 12개월 예금"));

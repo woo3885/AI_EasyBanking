@@ -8,6 +8,7 @@ import {
   type GeminiConversationTransport,
 } from "../conversation/geminiConversation.model.js";
 import { ScriptedConversationModel } from "../conversation/scriptedConversation.model.js";
+import { ProductionConversationModel } from "../conversation/productionConversation.model.js";
 import { C_D2_DEPOSIT_FIXTURES } from "./fixtures/cD2Deposit.fixtures.js";
 
 function request(id: string): ConversationAgentRequest {
@@ -46,6 +47,28 @@ test("C-D3-GEMINI-01 accepts a valid ConversationAgentRequest -> AgentDecision r
   const actual = await adapter(decision, prompts).decide(input);
   assert.deepEqual(actual, decision);
   assert.match(prompts[0] ?? "", /BEGIN_UNTRUSTED_DATA_JSON/u);
+});
+
+test("production conversation uses the Gemini decision for flexible wording", async () => {
+  const input = request("03");
+  input.userMessage.content = "백만 원 정도를 예금으로 굴리고 싶어요";
+  const expected = await new ScriptedConversationModel().decide(request("03"));
+  const prompts: string[] = [];
+  const model = new ProductionConversationModel(async ({ prompt }) => {
+    prompts.push(prompt);
+    return JSON.stringify(expected);
+  });
+
+  assert.deepEqual(await model.decide(input), expected);
+  assert.match(prompts[0] ?? "", /TRUSTED_RESPONSE_BINDINGS_JSON/u);
+});
+
+test("production conversation fails closed to the scripted model", async () => {
+  const input = request("03");
+  const expected = await new ScriptedConversationModel().decide(input);
+  const model = new ProductionConversationModel(async () => "not-json");
+
+  assert.deepEqual(await model.decide(input), expected);
 });
 
 test("C-D3-GEMINI-02 rejects an unknown mode", async () => {
