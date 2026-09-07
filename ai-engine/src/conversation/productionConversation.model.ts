@@ -5,6 +5,7 @@ import type {
   ConversationAgentRequest,
 } from "./conversationAgent.types.js";
 import {
+  GeminiConversationContractError,
   GeminiConversationModel,
   type GeminiConversationTransport,
 } from "./geminiConversation.model.js";
@@ -57,8 +58,10 @@ export class ProductionConversationModel implements ConversationModelPort {
   async decide(input: ConversationAgentRequest): Promise<AgentDecision> {
     const deterministic = await this.fallback.decide(input);
     try {
-      const model = new GeminiConversationModel(async ({ prompt }) =>
-        this.transport({ prompt: prompt + trustedBindings(input) })
+      const model = new GeminiConversationModel(
+        async ({ prompt }) =>
+          this.transport({ prompt: prompt + trustedBindings(input) }),
+        true,
       );
       const geminiDecision = await model.decide(input);
 
@@ -73,7 +76,9 @@ export class ProductionConversationModel implements ConversationModelPort {
     } catch (error) {
       console.error(
         "[AI Engine] Gemini conversation failed contract validation. Scripted fallback is returned.",
-        error instanceof Error ? error.name : "UnknownError",
+        error instanceof GeminiConversationContractError
+          ? `${error.name}:${error.code}`
+          : error instanceof Error ? error.name : "UnknownError",
       );
       return deterministic;
     }
