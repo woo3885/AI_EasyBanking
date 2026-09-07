@@ -13,7 +13,10 @@ import type { ConversationModelPort } from "./conversationModel.port.js";
 import { createConversationPrompt } from "./conversationPrompt.builder.js";
 import { ScriptedConversationModel } from "./scriptedConversation.model.js";
 import { validateUserGoalPatch } from "./conversationAgent.validator.js";
-import { questionMessage } from "./userGoalPatch.extractor.js";
+import {
+  extractInitialGoalPatch,
+  questionMessage,
+} from "./userGoalPatch.extractor.js";
 
 async function generateGeminiConversationText(
   { prompt }: { prompt: string },
@@ -76,9 +79,14 @@ function normalizeInitialDecision(
       "Gemini conversation output did not contain a goal patch.",
     );
   }
+  const lexical = extractInitialGoalPatch(input.goal, input.userMessage.content);
+  const lexicalIntent = lexical.kind === "PATCH" && lexical.patch.intent !== "UNKNOWN"
+    ? lexical.patch.intent
+    : undefined;
   const proposedPatch = {
     ...(proposed as Record<string, unknown>),
     basedOnRevision: input.goal.revision,
+    ...(lexicalIntent ? { intent: lexicalIntent } : {}),
   } as unknown as UserGoalPatch;
   const intent = proposedPatch.intent ?? input.goal.intent;
   const missingFields = intent === "DEPOSIT"
